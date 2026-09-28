@@ -22,7 +22,7 @@ from openai import OpenAI
 from app.config import settings
 from app.knowledge_base import load_vector_store, retrieve
 from app.high_risk_list import check_pregnancy_high_risk, check_baby_high_risk
-from app.schemas import FoodSafetyResponse, SafetyVerdict, Target, UserProfile, LifeStage
+from app.schemas import FoodSafetyResponse, Gender, SafetyVerdict, Target, UserProfile, LifeStage
 
 client = OpenAI(api_key=settings.openai_api_key)
 
@@ -109,12 +109,23 @@ def life_stage_note(profile: UserProfile) -> str:
             "Focus on recovery and general adult nutrition."
         )
 
-    return (
+    note = (
         "LIFE STAGE: The user is NOT pregnant, NOT breastfeeding, and NOT postpartum. "
         "Answer purely as general adult nutrition. Do NOT mention pregnancy, "
         "trimesters, prenatal risks, breastfeeding, or babies unless the user's "
         "question explicitly asks about them."
     )
+    if profile.gender == Gender.MALE:
+        note += (
+            " The user is an adult man: use adult male targets "
+            "(about 8 mg iron and 56 g protein a day)."
+        )
+    elif profile.gender == Gender.FEMALE:
+        note += (
+            " The user is an adult woman: use adult female targets "
+            "(about 18 mg iron and 46 g protein a day)."
+        )
+    return note
 
 
 def _words(text: str) -> set[str]:

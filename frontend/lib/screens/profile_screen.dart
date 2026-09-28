@@ -77,6 +77,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
               }).toList(),
             ),
           ),
+          if (profile.lifeStage == LifeStage.general) ...[
+            const SizedBox(height: AppSpacing.xxl),
+            const SectionHeader(
+              title: 'Gender',
+              subtitle: 'Sets your daily targets - men need less iron and more protein',
+            ),
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              children: Gender.values.map((gender) {
+                final selected = profile.gender == gender;
+                return Pressable(
+                  onTap: () => controller.update((profile) => profile.copyWith(gender: gender)),
+                  child: AnimatedContainer(
+                    duration: AppMotion.fast,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.lg,
+                      vertical: AppSpacing.md - 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: selected ? p.brand : p.surface,
+                      borderRadius: BorderRadius.circular(AppRadius.pill),
+                      border: Border.all(color: selected ? p.brand : p.border),
+                    ),
+                    child: Text(
+                      genderLabel(gender),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: selected ? p.onBrand : p.textSecondary,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
           if (profile.lifeStage == LifeStage.pregnancy) ...[
             const SizedBox(height: AppSpacing.xxl),
             const SectionHeader(title: 'Due date'),

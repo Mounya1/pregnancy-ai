@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/care_plan.dart';
+import '../models/user_profile.dart';
 import '../services/care_controller.dart';
 import '../services/profile_controller.dart';
 import '../theme/app_theme.dart';
+import '../widgets/stage_figure.dart';
 import '../widgets/ui/app_card.dart';
 import '../widgets/ui/empty_state.dart';
 import '../widgets/ui/illustrations.dart';
@@ -28,7 +30,10 @@ class CareScreen extends StatelessWidget {
     final supplements = supplementsFor(profile);
     final total = sections.fold<int>(0, (sum, s) => sum + s.tasks.length);
     final done = care.doneCountIn(sections);
-    final hasBaby = profile.babyAgeMonths != null;
+    final general = profile.lifeStage == LifeStage.general;
+    // Postpartum counts even before the birth date is filled in - the baby is
+    // here either way.
+    final hasBaby = !general && (profile.isAfterBirth || profile.babyAgeMonths != null);
 
     return Scaffold(
       appBar: embedded ? null : AppBar(title: const Text('Care plan')),
@@ -44,13 +49,21 @@ class CareScreen extends StatelessWidget {
             child: PhotoBanner(
               image: hasBaby
                   ? 'assets/images/mother_baby.jpg'
-                  : 'assets/images/mother.jpg',
-              title: hasBaby ? 'Your baby\'s first year' : 'Your pregnancy plan',
+                  : general
+                      ? 'assets/images/nutrition.jpg'
+                      : 'assets/images/mother.jpg',
+              title: hasBaby
+                  ? 'Your baby\'s first year'
+                  : general
+                      ? 'Your health plan'
+                      : 'Your pregnancy plan',
               subtitle: 'Appointments, tests, and what to take',
             ),
           ),
           const SizedBox(height: AppSpacing.xl),
-          Reveal(child: _CareHero(done: done, total: total, hasBaby: hasBaby)),
+          Reveal(
+            child: _CareHero(done: done, total: total, hasBaby: hasBaby, profile: profile),
+          ),
           const SizedBox(height: AppSpacing.xl),
           Reveal(
             delay: const Duration(milliseconds: 60),
@@ -146,11 +159,17 @@ class CareScreen extends StatelessWidget {
 
 /// Illustrated header, with the tick-off count as the headline number.
 class _CareHero extends StatelessWidget {
-  const _CareHero({required this.done, required this.total, required this.hasBaby});
+  const _CareHero({
+    required this.done,
+    required this.total,
+    required this.hasBaby,
+    required this.profile,
+  });
 
   final int done;
   final int total;
   final bool hasBaby;
+  final UserProfile profile;
 
   @override
   Widget build(BuildContext context) {
@@ -199,17 +218,12 @@ class _CareHero extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: AppSpacing.md),
-                    hasBaby
-                        ? HoldingBabyIllustration(
-                            color: p.accent,
-                            tones: tones,
-                            size: 112,
-                          )
-                        : MotherIllustration(
-                            color: p.brand,
-                            tones: tones,
-                            size: 112,
-                          ),
+                    StageFigure(
+                      profile: profile,
+                      color: hasBaby ? p.accent : p.brand,
+                      tones: tones,
+                      size: 112,
+                    ),
                   ],
                 ),
               ),

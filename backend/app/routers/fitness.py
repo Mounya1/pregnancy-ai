@@ -3,7 +3,7 @@ from fastapi import APIRouter
 from openai import OpenAI
 
 from app.config import settings
-from app.schemas import FitnessPlanRequest, FitnessPlanResponse
+from app.schemas import FitnessPlanRequest, FitnessPlanResponse, Gender, LifeStage
 
 router = APIRouter(prefix="/fitness-plan", tags=["fitness"])
 client = OpenAI(api_key=settings.openai_api_key)
@@ -66,6 +66,8 @@ Respond ONLY with valid JSON matching this exact shape, no markdown:
 def generate_fitness_plan(req: FitnessPlanRequest):
     profile = req.profile
     note = f"Life stage: {profile.life_stage.value}."
+    if profile.life_stage == LifeStage.GENERAL and profile.gender != Gender.UNSPECIFIED:
+        note += f" The user is {'a man' if profile.gender == Gender.MALE else 'a woman'}."
 
     if profile.pregnancy_week:
         week = profile.pregnancy_week

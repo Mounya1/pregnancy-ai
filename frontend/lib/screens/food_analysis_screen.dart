@@ -215,7 +215,7 @@ class _FoodAnalysisScreenState extends State<FoodAnalysisScreen> {
             const SizedBox(height: AppSpacing.xl),
             _NutrientPanel(
               estimate: _result!.nutrients,
-              targets: targetsForLifeStage(widget.profile.lifeStage),
+              targets: targetsForProfile(widget.profile),
               logged: _logged,
               onLog: _logScannedFood,
             ),

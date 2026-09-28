@@ -11,6 +11,7 @@ import '../theme/app_theme.dart';
 import '../theme/breakpoints.dart';
 import '../widgets/bloom_home.dart';
 import '../widgets/app_nav_bar.dart';
+import '../widgets/stage_figure.dart';
 import '../widgets/week_ring.dart';
 import '../widgets/ui/app_card.dart';
 import '../widgets/ui/illustrations.dart';
@@ -573,19 +574,14 @@ class _HeroHeader extends StatelessWidget {
               // Strong enough to actually see against the gradient, still
               // clearly behind the text.
               opacity: 0.34,
-              child: !profileHasBaby(profile)
-                  ? const MotherIllustration(
-                      color: Colors.white,
-                      accent: Color(0xFFEDE7FF),
-                      size: 150,
-                    )
-                  // Once the baby is here the header shows the pair, not the
-                  // baby alone - the app is for both of them.
-                  : const HoldingBabyIllustration(
-                      color: Colors.white,
-                      accent: Color(0xFFEDE7FF),
-                      size: 148,
-                    ),
+              // Once the baby is here the header shows the pair, not the baby
+              // alone - the app is for both of them.
+              child: StageFigure(
+                profile: profile,
+                color: Colors.white,
+                accent: const Color(0xFFEDE7FF),
+                size: 150,
+              ),
             ),
           ),
           _buildContent(context, p),
@@ -977,15 +973,6 @@ String trimesterLabel(int week) {
 /// A full-colour illustrated panel: the figure is the point here, not a
 /// watermark, so it gets real size, real tones, and a light backdrop that lets
 /// those tones read properly.
-/// Whether there is actually a baby to draw.
-///
-/// Not simply "not pregnant": a general-nutrition user has no baby, and
-/// showing them a mother holding one is both wrong and a little cruel.
-bool profileHasBaby(UserProfile profile) =>
-    profile.babyBirthDate != null ||
-    profile.lifeStage == LifeStage.breastfeeding ||
-    profile.lifeStage == LifeStage.postpartum;
-
 /// Three dials summarising today's logged nutrition against the targets for
 /// the user's life stage, linking through to the full tracker.
 class _NutritionSnapshot extends StatelessWidget {
@@ -1002,7 +989,7 @@ class _NutritionSnapshot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final targets = targetsForLifeStage(profile.lifeStage);
+    final targets = targetsForProfile(profile);
     final total = entries.fold(const NutrientProfile(), (sum, e) => sum + e.nutrients);
 
     return AppCard(

@@ -956,7 +956,7 @@ class _ScanResultState extends State<_ScanResult> {
                 const SizedBox(height: AppSpacing.md),
                 NutrientBreakdown(
                   nutrients: estimate.perServing,
-                  targets: targetsForLifeStage(widget.profile.lifeStage),
+                  targets: targetsForProfile(widget.profile),
                   servingDescription: estimate.servingDescription,
                   note: estimate.note,
                   isEstimate: estimate.isEstimate,

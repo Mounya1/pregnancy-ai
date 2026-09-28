@@ -34,6 +34,7 @@ import 'package:pregnancy_ai_assistant/theme/app_theme.dart';
 import 'package:pregnancy_ai_assistant/theme/brand_flavor.dart';
 import 'package:pregnancy_ai_assistant/screens/me_screen.dart';
 import 'package:pregnancy_ai_assistant/widgets/app_nav_bar.dart';
+import 'package:pregnancy_ai_assistant/widgets/stage_figure.dart';
 import 'package:pregnancy_ai_assistant/widgets/suggestion_field.dart';
 import 'package:pregnancy_ai_assistant/widgets/ui/illustrations.dart';
 import 'package:pregnancy_ai_assistant/widgets/ui/segmented_tabs.dart';
@@ -311,24 +312,29 @@ void main() {
     // The gradient header draws a figure as a low-opacity watermark. The
     // point of this test is that Home carries a full-strength image as well,
     // so it does not read as a page of text with a ghost behind it. That used
-    // to be the illustrated stage card; it is now the hero artwork.
+    // to be the illustrated stage card; it is now the hero artwork. A fresh
+    // profile is General, so the hero is the everyday woman, not a pregnancy.
     final hero = find.byWidgetPredicate(
       (w) =>
           w is Image &&
           w.image is AssetImage &&
-          (w.image as AssetImage).assetName ==
-              'assets/images/hero_pregnancy.jpg',
+          (w.image as AssetImage).assetName == 'assets/images/general_woman.png',
     );
     expect(hero, findsOneWidget, reason: 'no hero illustration on the home screen');
-
-    // And the watermark figure is still behind the greeting.
     expect(
       find.byWidgetPredicate(
         (w) =>
-            w is MotherIllustration ||
-            w is BabyIllustration ||
-            w is HoldingBabyIllustration,
+            w is Image &&
+            w.image is AssetImage &&
+            (w.image as AssetImage).assetName == 'assets/images/hero_pregnancy.jpg',
       ),
+      findsNothing,
+      reason: 'a General profile must not be shown a pregnancy',
+    );
+
+    // And the watermark figure is still behind the greeting.
+    expect(
+      find.byWidgetPredicate((w) => w is PersonIllustration && w.tones == null),
       findsWidgets,
     );
   });
@@ -524,6 +530,35 @@ void main() {
     );
     // A jump from zero would read as infinite improvement, so it stays null.
     expect(stats.build().first.deltaPercent, isNull);
+  });
+
+  test('general targets follow gender; other stages ignore it', () {
+    final man = UserProfile(lifeStage: LifeStage.general, gender: Gender.male);
+    expect(targetsForProfile(man).ironMg, 8);
+    expect(targetsForProfile(man).proteinG, 56);
+
+    final woman = UserProfile(lifeStage: LifeStage.general, gender: Gender.female);
+    expect(targetsForProfile(woman).ironMg, 18);
+
+    // A stale "male" left over from General must not lower a pregnancy target.
+    final pregnant = UserProfile(lifeStage: LifeStage.pregnancy, gender: Gender.male);
+    expect(targetsForProfile(pregnant).ironMg, 27);
+    expect(pregnant.toApiJson()['gender'], 'female');
+
+    // Survives a save and reload.
+    expect(UserProfile.fromStorageJson(man.toStorageJson()).gender, Gender.male);
+
+    // And picks the matching home picture.
+    expect(stageHeroImage(man), 'assets/images/general_man.png');
+    expect(stageHeroImage(woman), 'assets/images/general_woman.png');
+    expect(
+      stageHeroImage(UserProfile(lifeStage: LifeStage.postpartum)),
+      'assets/images/mother_holding_baby.png',
+    );
+    expect(
+      stageHeroImage(UserProfile(lifeStage: LifeStage.pregnancy)),
+      'assets/images/hero_pregnancy.jpg',
+    );
   });
 
   test('baby weight is read against an age-appropriate range', () {

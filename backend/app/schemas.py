@@ -17,6 +17,14 @@ class LifeStage(str, Enum):
     GENERAL = "general"                       # no active pregnancy/postpartum context
 
 
+class Gender(str, Enum):
+    """The user's own gender. Only meaningful for GENERAL - every other stage
+    implies a woman - where it changes the adult targets (iron, protein)."""
+    FEMALE = "female"
+    MALE = "male"
+    UNSPECIFIED = "unspecified"
+
+
 class Target(str, Enum):
     """Whose safety this verdict is about - matters once a baby is in the picture."""
     MOTHER = "mother"
@@ -40,6 +48,7 @@ class UserProfile(BaseModel):
     # Conditions the diet must account for, e.g. ["gestational diabetes"].
     # Usually populated from an uploaded report via /medical-report.
     health_conditions: List[str] = Field(default_factory=list)
+    gender: Gender = Gender.UNSPECIFIED
 
 
 class FoodSafetyResponse(BaseModel):

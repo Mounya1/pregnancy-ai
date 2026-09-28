@@ -47,11 +47,16 @@ class NutrientWeek {
 /// Weeks run Monday to Sunday so "this week" matches how people talk about it,
 /// rather than a rolling 7 days that shifts every day.
 class WeeklyStats {
-  WeeklyStats({required this.entries, required this.lifeStage, DateTime? now})
-      : _now = now ?? DateTime.now();
+  WeeklyStats({
+    required this.entries,
+    required this.lifeStage,
+    this.gender = Gender.unspecified,
+    DateTime? now,
+  }) : _now = now ?? DateTime.now();
 
   final List<NutritionEntry> entries;
   final LifeStage lifeStage;
+  final Gender gender;
   final DateTime _now;
 
   DateTime get weekStart {
@@ -65,7 +70,7 @@ class WeeklyStats {
   int get todayIndex => _now.weekday - DateTime.monday;
 
   List<NutrientWeek> build() {
-    final targets = targetsForLifeStage(lifeStage);
+    final targets = targetsForLifeStage(lifeStage, gender);
     final thisWeek = _dailyBuckets(weekStart);
     final lastWeek = _dailyBuckets(previousWeekStart);
 

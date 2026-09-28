@@ -53,7 +53,11 @@ class _TrendsScreenState extends State<TrendsScreen> {
   Widget build(BuildContext context) {
     final p = context.palette;
     final profile = context.watch<ProfileController>().profile;
-    final stats = WeeklyStats(entries: _entries, lifeStage: profile.lifeStage);
+    final stats = WeeklyStats(
+      entries: _entries,
+      lifeStage: profile.lifeStage,
+      gender: profile.gender,
+    );
     final weeks = stats.build();
 
     return Scaffold(

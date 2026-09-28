@@ -4,6 +4,7 @@ import '../models/pregnancy_week.dart';
 import '../models/user_profile.dart';
 import '../theme/app_theme.dart';
 import '../theme/breakpoints.dart';
+import 'stage_figure.dart';
 import 'ui/app_card.dart';
 
 /// The Bloom landing layout: a masthead, a display-type hero, a row of
@@ -289,7 +290,7 @@ class BloomHero extends StatelessWidget {
       onAsk: onAsk,
       isPregnancy: _isPregnancy,
     );
-    const art = _HeroArt();
+    final art = _HeroArt(profile: profile);
 
     if (!wide) {
       return Column(
@@ -309,18 +310,23 @@ class BloomHero extends StatelessWidget {
       children: [
         Expanded(flex: 55, child: text),
         const SizedBox(width: AppSpacing.xxxl),
-        const Expanded(flex: 40, child: art),
+        Expanded(flex: 40, child: art),
       ],
     );
   }
 }
 
+/// Pregnant while pregnant, mother and baby after the birth, and a man or
+/// woman in General mode.
 class _HeroArt extends StatelessWidget {
-  const _HeroArt();
+  const _HeroArt({required this.profile});
+
+  final UserProfile profile;
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final image = stageHeroImage(profile);
     return Container(
       decoration: BoxDecoration(
         color: p.surfaceRaised,
@@ -331,10 +337,18 @@ class _HeroArt extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: AspectRatio(
         aspectRatio: 900 / 756,
-        child: Image.asset(
-          'assets/images/hero_pregnancy.jpg',
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+        // Contain, not cover: the stage pictures are portrait and this frame
+        // is landscape, so cover would crop off heads and feet. The fill
+        // matches the pictures' own background so the letterbox is invisible.
+        // The landscape pregnancy picture is exactly the frame's shape, so
+        // contain changes nothing for it.
+        child: ColoredBox(
+          color: const Color(0xFFFAF8FD),
+          child: Image.asset(
+            image,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+          ),
         ),
       ),
     );

@@ -117,17 +117,27 @@ const Map<String, NutrientProfile> kNutrientDatabase = {
 /// Daily RDA-style targets by life stage. Pregnancy and breastfeeding values
 /// are elevated versions of general adult female targets - approximate,
 /// intended for self-tracking motivation, not clinical precision.
-NutrientProfile targetsForLifeStage(LifeStage stage) {
+///
+/// [gender] only matters in General mode, where an adult man's targets
+/// differ: 8mg iron (no menstrual losses) and 56g protein (NIH, ages 19-50).
+/// Unspecified keeps the female values - the higher iron target is the safer
+/// one to aim for when we do not know.
+NutrientProfile targetsForLifeStage(LifeStage stage, [Gender gender = Gender.unspecified]) {
   switch (stage) {
     case LifeStage.pregnancy:
       return const NutrientProfile(ironMg: 27, calciumMg: 1000, folateMcg: 600, proteinG: 71, vitaminDMcg: 15);
     case LifeStage.breastfeeding:
       return const NutrientProfile(ironMg: 9, calciumMg: 1000, folateMcg: 500, proteinG: 71, vitaminDMcg: 15);
+    case LifeStage.general when gender == Gender.male:
+      return const NutrientProfile(ironMg: 8, calciumMg: 1000, folateMcg: 400, proteinG: 56, vitaminDMcg: 15);
     case LifeStage.postpartum:
     case LifeStage.general:
       return const NutrientProfile(ironMg: 18, calciumMg: 1000, folateMcg: 400, proteinG: 46, vitaminDMcg: 15);
   }
 }
+
+NutrientProfile targetsForProfile(UserProfile profile) =>
+    targetsForLifeStage(profile.lifeStage, profile.gender);
 
 /// How the entry got into the log. Only used for wording and an icon, but
 /// the difference matters: a value looked up in the built-in table is exact,

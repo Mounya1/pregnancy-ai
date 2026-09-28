@@ -850,3 +850,195 @@ class _HoldingBabyPainter extends CustomPainter {
       old.rock != rock ||
       old.heart != heart;
 }
+
+/// A man or woman standing, facing us - for General mode, where there is no
+/// pregnancy and no baby, so neither of the figures above is true.
+///
+/// Only breathes. There is no story to tell here beyond "you", so nothing
+/// else moves.
+class PersonIllustration extends StatefulWidget {
+  const PersonIllustration({
+    super.key,
+    required this.color,
+    this.male = false,
+    this.size = 120,
+    this.accent,
+    this.animate = true,
+    this.tones,
+  });
+
+  final Color color;
+
+  /// Broad shoulders, short hair, trousers. Otherwise a woman in a dress.
+  final bool male;
+  final double size;
+
+  /// Second tone for the hair (and a man's trousers) when [tones] is not given.
+  final Color? accent;
+  final bool animate;
+
+  /// Full-colour tones. When null the figure is a flat [color] silhouette.
+  final FigureTones? tones;
+
+  @override
+  State<PersonIllustration> createState() => _PersonIllustrationState();
+}
+
+class _PersonIllustrationState extends State<PersonIllustration>
+    with TickerProviderStateMixin, _BreathingState {
+  @override
+  bool get wantsMotion => widget.animate;
+
+  @override
+  Widget build(BuildContext context) {
+    final tones = widget.tones ??
+        FigureTones.mono(widget.color).copyWithHair(widget.accent ?? widget.color);
+
+    return SizedBox(
+      width: widget.size,
+      height: widget.size,
+      child: AnimatedBuilder(
+        animation: breathController,
+        builder: (context, _) => CustomPaint(
+          painter: _PersonPainter(
+            tones: tones,
+            male: widget.male,
+            breath: frozen ? 0.5 : breath,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PersonPainter extends CustomPainter {
+  _PersonPainter({required this.tones, required this.male, required this.breath});
+
+  final FigureTones tones;
+  final bool male;
+  final double breath;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final lift = -h * 0.006 * breath;
+
+    final clothes = Paint()
+      ..color = tones.dress
+      ..isAntiAlias = true;
+    final skin = Paint()
+      ..color = tones.skin
+      ..isAntiAlias = true;
+    final hair = Paint()
+      ..color = tones.hair
+      ..isAntiAlias = true;
+
+    // Long hair falls behind the shoulders, so it goes down before the body.
+    if (!male) {
+      canvas.drawPath(
+        Path()
+          ..moveTo(w * 0.395, h * 0.15 + lift)
+          ..cubicTo(w * 0.37, h * 0.24, w * 0.37, h * 0.32, w * 0.39, h * 0.36 + lift)
+          ..lineTo(w * 0.61, h * 0.36 + lift)
+          ..cubicTo(w * 0.63, h * 0.32, w * 0.63, h * 0.24, w * 0.605, h * 0.15 + lift)
+          ..close(),
+        hair,
+      );
+    }
+
+    // Arms hang at the sides, behind the torso.
+    final arm = Paint()
+      ..color = tones.skin
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = w * (male ? 0.066 : 0.056)
+      ..strokeCap = StrokeCap.round
+      ..isAntiAlias = true;
+    final shoulder = male ? 0.29 : 0.34;
+    canvas.drawLine(
+      Offset(w * (shoulder + 0.03), h * 0.33 + lift),
+      Offset(w * (shoulder - 0.01), h * 0.63),
+      arm,
+    );
+    canvas.drawLine(
+      Offset(w * (1 - shoulder - 0.03), h * 0.33 + lift),
+      Offset(w * (1 - shoulder + 0.01), h * 0.63),
+      arm,
+    );
+
+    // Neck.
+    canvas.drawRect(
+      Rect.fromLTRB(w * 0.465, h * 0.22 + lift, w * 0.535, h * 0.30 + lift),
+      skin,
+    );
+
+    if (male) {
+      // Trousers: two legs with a gap, in the hair tone so they read darker
+      // than the shirt in full colour and merge into one shape as a silhouette.
+      canvas.drawPath(
+        Path()
+          ..moveTo(w * 0.35, h * 0.64)
+          ..lineTo(w * 0.36, h * 0.99)
+          ..lineTo(w * 0.485, h * 0.99)
+          ..lineTo(w * 0.50, h * 0.72)
+          ..lineTo(w * 0.515, h * 0.99)
+          ..lineTo(w * 0.64, h * 0.99)
+          ..lineTo(w * 0.65, h * 0.64)
+          ..close(),
+        hair,
+      );
+      // Shirt: squared shoulders tapering to the waist.
+      canvas.drawPath(
+        Path()
+          ..moveTo(w * 0.30, h * 0.34 + lift)
+          ..cubicTo(w * 0.31, h * 0.30 + lift, w * 0.36, h * 0.285 + lift, w * 0.44, h * 0.28 + lift)
+          ..lineTo(w * 0.56, h * 0.28 + lift)
+          ..cubicTo(w * 0.64, h * 0.285 + lift, w * 0.69, h * 0.30 + lift, w * 0.70, h * 0.34 + lift)
+          ..cubicTo(w * 0.68, h * 0.46, w * 0.66, h * 0.56, w * 0.655, h * 0.66)
+          ..lineTo(w * 0.345, h * 0.66)
+          ..cubicTo(w * 0.34, h * 0.56, w * 0.32, h * 0.46, w * 0.30, h * 0.34 + lift)
+          ..close(),
+        clothes,
+      );
+    } else {
+      // Dress: narrower shoulders, in at the waist, flaring to the hem.
+      canvas.drawPath(
+        Path()
+          ..moveTo(w * 0.36, h * 0.32 + lift)
+          ..cubicTo(w * 0.38, h * 0.29 + lift, w * 0.43, h * 0.28 + lift, w * 0.50, h * 0.28 + lift)
+          ..cubicTo(w * 0.57, h * 0.28 + lift, w * 0.62, h * 0.29 + lift, w * 0.64, h * 0.32 + lift)
+          ..cubicTo(w * 0.63, h * 0.42, w * 0.59, h * 0.50, w * 0.60, h * 0.56)
+          ..cubicTo(w * 0.64, h * 0.70, w * 0.70, h * 0.86, w * 0.72, h * 0.99)
+          ..lineTo(w * 0.28, h * 0.99)
+          ..cubicTo(w * 0.30, h * 0.86, w * 0.36, h * 0.70, w * 0.40, h * 0.56)
+          ..cubicTo(w * 0.41, h * 0.50, w * 0.37, h * 0.42, w * 0.36, h * 0.32 + lift)
+          ..close(),
+        clothes,
+      );
+    }
+
+    // Head.
+    canvas.drawCircle(Offset(w * 0.50, h * 0.155 + lift), w * 0.092, skin);
+
+    // Hair on top: a short crop for him, a softer parted cap for her.
+    canvas.drawPath(
+      male
+          ? (Path()
+            ..moveTo(w * 0.404, h * 0.160 + lift)
+            ..cubicTo(w * 0.395, h * 0.005 + lift, w * 0.605, h * 0.005 + lift, w * 0.596, h * 0.160 + lift)
+            ..cubicTo(w * 0.575, h * 0.100 + lift, w * 0.425, h * 0.100 + lift, w * 0.404, h * 0.160 + lift)
+            ..close())
+          : (Path()
+            ..moveTo(w * 0.400, h * 0.19 + lift)
+            ..cubicTo(w * 0.385, h * -0.01 + lift, w * 0.615, h * -0.01 + lift, w * 0.600, h * 0.19 + lift)
+            ..cubicTo(w * 0.585, h * 0.12 + lift, w * 0.53, h * 0.095 + lift, w * 0.49, h * 0.10 + lift)
+            ..cubicTo(w * 0.45, h * 0.11 + lift, w * 0.41, h * 0.13 + lift, w * 0.400, h * 0.19 + lift)
+            ..close()),
+      hair,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _PersonPainter old) =>
+      old.tones != tones || old.male != male || old.breath != breath;
+}

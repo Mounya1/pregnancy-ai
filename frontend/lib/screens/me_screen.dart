@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/user_profile.dart';
 import '../services/auth_controller.dart';
 import '../services/profile_controller.dart';
 import '../services/reminder_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ui/app_card.dart';
 import '../widgets/ui/empty_state.dart';
+import '../widgets/stage_figure.dart';
 import '../widgets/ui/illustrations.dart';
 import '../widgets/ui/reveal.dart';
 import 'auth/account_screen.dart';
@@ -74,7 +76,7 @@ class MeScreen extends StatelessWidget {
         children: [
           Reveal(
             child: _SummaryCard(
-              hasBaby: profile.babyBirthDate != null,
+              profile: profile,
               name: account?.name ?? 'Your profile',
               initials: account?.initials,
               statusLabel: profile.statusLabel,
@@ -170,7 +172,7 @@ class MeScreen extends StatelessWidget {
 
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard({
-    required this.hasBaby,
+    required this.profile,
     required this.name,
     required this.initials,
     required this.statusLabel,
@@ -180,8 +182,9 @@ class _SummaryCard extends StatelessWidget {
     required this.onTap,
   });
 
-  /// Swaps the watermark figure once there is a baby to hold.
-  final bool hasBaby;
+  /// Picks the watermark figure: pregnant, holding the baby, or - in General
+  /// mode - a man or woman.
+  final UserProfile profile;
 
   final String name;
 
@@ -208,17 +211,12 @@ class _SummaryCard extends StatelessWidget {
             bottom: -10,
             child: Opacity(
               opacity: 0.3,
-              child: hasBaby
-                  ? const HoldingBabyIllustration(
-                      color: Colors.white,
-                      accent: Color(0xFFEDE7FF),
-                      size: 116,
-                    )
-                  : const MotherIllustration(
-                      color: Colors.white,
-                      accent: Color(0xFFEDE7FF),
-                      size: 112,
-                    ),
+              child: StageFigure(
+                profile: profile,
+                color: Colors.white,
+                accent: const Color(0xFFEDE7FF),
+                size: 116,
+              ),
             ),
           ),
           Padding(

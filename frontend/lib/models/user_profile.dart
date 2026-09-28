@@ -26,6 +26,33 @@ String babyGenderLabel(BabyGender g) {
   }
 }
 
+/// The user's own gender. Only asked for in General mode, where it sets the
+/// daily targets (men need less iron and more protein) and the figure shown.
+/// Every other stage implies a woman, so it is ignored there.
+enum Gender { female, male, unspecified }
+
+Gender genderFromString(String? value) {
+  switch (value) {
+    case 'female':
+      return Gender.female;
+    case 'male':
+      return Gender.male;
+    default:
+      return Gender.unspecified;
+  }
+}
+
+String genderLabel(Gender g) {
+  switch (g) {
+    case Gender.female:
+      return 'Woman';
+    case Gender.male:
+      return 'Man';
+    case Gender.unspecified:
+      return 'Prefer not to say';
+  }
+}
+
 String lifeStageToApiString(LifeStage s) {
   switch (s) {
     case LifeStage.pregnancy:
@@ -98,6 +125,9 @@ class UserProfile {
   /// Baby's gender, once known. Only used for the app's colour after birth.
   BabyGender babyGender;
 
+  /// The user's own gender. See [Gender].
+  Gender gender;
+
   UserProfile({
     this.lifeStage = LifeStage.general,
     this.dueDate,
@@ -107,7 +137,17 @@ class UserProfile {
     this.cuisines = const [],
     this.healthConditions = const [],
     this.babyGender = BabyGender.unspecified,
+    this.gender = Gender.unspecified,
   });
+
+  /// The gender that actually applies: whatever was picked in General mode,
+  /// and a woman in every pregnancy or postpartum stage.
+  Gender get effectiveGender => lifeStage == LifeStage.general ? gender : Gender.female;
+
+  /// After the birth, so the figure is a mother holding her baby rather than
+  /// a pregnant one.
+  bool get isAfterBirth =>
+      lifeStage == LifeStage.breastfeeding || lifeStage == LifeStage.postpartum;
 
   /// Standard pregnancy is ~40 weeks; count backward from the due date.
   int? get pregnancyWeek {
@@ -132,6 +172,7 @@ class UserProfile {
         'dietary_preferences': dietaryPreferences,
         'cuisines': cuisines,
         'health_conditions': healthConditions,
+        'gender': effectiveGender.name,
       };
 
   Map<String, dynamic> toStorageJson() => {
@@ -143,6 +184,7 @@ class UserProfile {
         'cuisines': cuisines,
         'health_conditions': healthConditions,
         'baby_gender': babyGender.name,
+        'gender': gender.name,
       };
 
   factory UserProfile.fromStorageJson(Map<String, dynamic> json) {
@@ -156,6 +198,7 @@ class UserProfile {
       cuisines: List<String>.from(json['cuisines'] ?? const []),
       healthConditions: List<String>.from(json['health_conditions'] ?? const []),
       babyGender: babyGenderFromString(json['baby_gender'] as String?),
+      gender: genderFromString(json['gender'] as String?),
     );
   }
 
@@ -185,6 +228,7 @@ class UserProfile {
     List<String>? cuisines,
     List<String>? healthConditions,
     BabyGender? babyGender,
+    Gender? gender,
   }) {
     return UserProfile(
       lifeStage: lifeStage ?? this.lifeStage,
@@ -195,6 +239,7 @@ class UserProfile {
       cuisines: cuisines ?? this.cuisines,
       healthConditions: healthConditions ?? this.healthConditions,
       babyGender: babyGender ?? this.babyGender,
+      gender: gender ?? this.gender,
     );
   }
 }

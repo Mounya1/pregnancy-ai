@@ -63,7 +63,7 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen> {
     final p = context.palette;
     final profile = context.watch<ProfileController>().profile;
     final log = context.watch<NutritionController>();
-    final targets = targetsForLifeStage(profile.lifeStage);
+    final targets = targetsForProfile(profile);
     final entries = log.today;
     final total = log.totalFor(entries);
 
@@ -516,7 +516,7 @@ class _AddEntrySheetState extends State<_AddEntrySheet> {
     final p = context.palette;
     final matches = _matches;
     final estimate = _estimate;
-    final targets = targetsForLifeStage(context.watch<ProfileController>().profile.lifeStage);
+    final targets = targetsForProfile(context.watch<ProfileController>().profile);
     final ready = _selectedFood != null || estimate != null;
 
     return Padding(
