@@ -218,6 +218,25 @@ gcloud run services update pregnancy-ai-backend --region us-central1 \
 Do it in that order. Closing CORS before the frontend is repointed just breaks
 the live site.
 
+### 6b. Rate limits
+
+Every AI request is capped per visitor's IP: 20 a minute and 300 a day, with
+uploads capped at 10 MB. Visitors past the cap get a "please try again in N
+minutes" message rather than an error. Change the caps without a redeploy:
+
+```bash
+gcloud run services update pregnancy-ai-backend --region us-central1 \
+  --update-env-vars RATE_LIMIT_PER_MINUTE=20,RATE_LIMIT_PER_DAY=300,MAX_UPLOAD_MB=10
+```
+
+The counts live in each instance's memory, so the real ceiling is the cap
+times the number of instances. Cap the instances too, which also bounds the
+worst-case bill:
+
+```bash
+gcloud run services update pregnancy-ai-backend --region us-central1 --max-instances 3
+```
+
 ### 7. Set a budget alert
 
 **Billing → Budgets & alerts → Create budget** → amount `1` → alert at 100%.

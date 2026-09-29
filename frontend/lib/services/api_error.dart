@@ -51,6 +51,22 @@ String describeApiError(Object error, {required String baseUrl}) {
         return 'That endpoint is missing on the server ($status). '
             'Restart the backend so it picks up the newest routes.';
       }
+      // Rate limit and size cap - the user's own doing, and fixable by them,
+      // so say what to do rather than showing a status code.
+      if (status == 429) {
+        final wait = int.tryParse(error.response?.headers.value('retry-after') ?? '');
+        final when = wait == null
+            ? 'in a minute'
+            : wait < 90
+                ? 'in $wait seconds'
+                : wait < 5400
+                    ? 'in ${(wait / 60).ceil()} minutes'
+                    : 'tomorrow';
+        return "You've asked a lot of questions in a short time. Please try again $when.";
+      }
+      if (status == 413) {
+        return detail ?? 'That file is too large to upload.';
+      }
       if (status == 422) {
         return 'The server could not read the request (422).'
             '${detail == null ? '' : '\n$detail'}';

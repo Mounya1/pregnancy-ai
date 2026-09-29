@@ -28,10 +28,21 @@ client = OpenAI(api_key=settings.openai_api_key)
 
 SYSTEM_PROMPT = """You are a maternal and infant nutrition safety assistant, covering
 pregnancy, breastfeeding/postpartum, and baby feeding (starting solids through toddlerhood).
-You MUST base your answer only on the CONTEXT provided below, sourced from ACOG, CDC, FDA,
-NIH, and AAP guidance. Do not invent facts or sources not present in the context. If the
-context does not cover the food for the given life stage, set verdict to
-"Unknown - Ask Your Doctor" and say so honestly.
+Base your answer on the CONTEXT provided below, sourced from ACOG, CDC, FDA, NIH, and AAP
+guidance, whenever it covers the food. Never invent a source, and never cite one of those
+bodies for something the context does not say.
+
+WHEN THE CONTEXT DOES NOT COVER THE FOOD:
+- If it is a common, everyday food (a fruit, vegetable, grain, dish, drink, or snack people
+  routinely eat - e.g. dates, guava, ghee, oats, idli) and the safe answer for this life
+  stage is well established in mainstream nutrition guidance, answer it from that general
+  knowledge. Set "from_general_knowledge" to true and "sources" to
+  ["General nutrition guidance"]. Apply the usual food-safety basics (washing, cooking,
+  pasteurisation) and portion sense rather than inventing specific risks.
+- Otherwise - supplements, herbs and herbal remedies, medicines, unusual or foraged foods,
+  anything where the answer depends on a medical condition, or anything you are not
+  confident about - set verdict to "Unknown - Ask Your Doctor" and say so honestly.
+When the context DOES cover the food, set "from_general_knowledge" to false.
 
 You will be told the TARGET of the verdict: "mother" (is this food safe for the user to eat,
 given their stated life stage) or "baby". When the target is "baby", the TARGET DETAIL line in
@@ -71,7 +82,8 @@ Respond ONLY with valid JSON matching this exact shape, no markdown, no preamble
   "risks": [string],
   "recommended_serving": string or null,
   "better_alternatives": [string],
-  "sources": [string]
+  "sources": [string],
+  "from_general_knowledge": boolean
 }
 """
 
@@ -126,6 +138,23 @@ def life_stage_note(profile: UserProfile) -> str:
             "(about 18 mg iron and 46 g protein a day)."
         )
     return note
+
+
+def language_note(profile: UserProfile) -> str:
+    """Asks for free text in the user's language, and nothing else.
+
+    JSON keys and enum values (the verdict) must stay exactly as specified -
+    the app parses them - so the instruction says so explicitly. Empty for
+    English, which needs no instruction.
+    """
+    language = re.sub(r"[^A-Za-z \-()]", "", profile.language or "").strip()
+    if not language or language.lower() == "english":
+        return ""
+    return (
+        f"LANGUAGE: Write every human-readable text value in {language}. "
+        "Keep all JSON keys, and any value that must be one of a fixed set of "
+        "options (such as the verdict), exactly as specified in English."
+    )
 
 
 def _words(text: str) -> set[str]:
@@ -230,6 +259,11 @@ def _build_context(query: str, extra_query_terms: str = ""):
     return context_text
 
 
+def _with_language(note: str, profile: UserProfile) -> str:
+    language = language_note(profile)
+    return f"{note}\n{language}" if language else note
+
+
 def _call_llm(food_query: str, target: Target, context_text: str, note: str) -> FoodSafetyResponse:
     # The life stage is stated before the context and again after it. With the
     # stage mentioned only once, and only at the end, the retrieved chunks -
@@ -312,7 +346,7 @@ def analyze_for_mother(food_query: str, profile: UserProfile) -> FoodSafetyRespo
         note = f"{note}\n{constraints}"
 
     context_text = _build_context(food_query, _retrieval_terms(profile))
-    result = _call_llm(food_query, Target.MOTHER, context_text, note)
+    result = _call_llm(food_query, Target.MOTHER, context_text, _with_language(note, profile))
 
     override = check_pregnancy_high_risk(food_query)
     if override and profile.life_stage == LifeStage.PREGNANCY:
@@ -320,6 +354,7 @@ def analyze_for_mother(food_query: str, profile: UserProfile) -> FoodSafetyRespo
         result.verdict = verdict
         result.explanation = reason
         result.sources = sources
+        result.from_general_knowledge = False
         result.is_high_risk_override = True
 
     # Allergy runs last so it wins over both the model and the high-risk list.
@@ -351,7 +386,7 @@ def _analyze_for_unborn(food_query: str, profile: UserProfile) -> FoodSafetyResp
         )
 
     context_text = _build_context(food_query, "pregnancy fetal development placenta")
-    result = _call_llm(food_query, Target.BABY, context_text, note)
+    result = _call_llm(food_query, Target.BABY, context_text, _with_language(note, profile))
 
     override = check_pregnancy_high_risk(food_query)
     if override:
@@ -359,6 +394,7 @@ def _analyze_for_unborn(food_query: str, profile: UserProfile) -> FoodSafetyResp
         result.verdict = verdict
         result.explanation = reason
         result.sources = sources
+        result.from_general_knowledge = False
         result.is_high_risk_override = True
 
     # A maternal allergy reaches the baby through the mother, so this card must
@@ -407,7 +443,7 @@ def analyze_for_baby(food_query: str, profile: UserProfile) -> FoodSafetyRespons
         note += f"\nHOUSEHOLD DIET: {', '.join(profile.dietary_preferences)}."
 
     context_text = _build_context(food_query, "baby feeding solids choking allergen")
-    result = _call_llm(food_query, Target.BABY, context_text, note)
+    result = _call_llm(food_query, Target.BABY, context_text, _with_language(note, profile))
 
     override = check_baby_high_risk(food_query, profile.baby_age_months)
     if override:
@@ -415,6 +451,7 @@ def analyze_for_baby(food_query: str, profile: UserProfile) -> FoodSafetyRespons
         result.verdict = verdict
         result.explanation = reason
         result.sources = sources
+        result.from_general_knowledge = False
         result.is_high_risk_override = True
 
     return result

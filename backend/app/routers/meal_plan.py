@@ -5,7 +5,7 @@ from openai import OpenAI
 from app.config import settings
 from app.schemas import LifeStage, MealPlanRequest, MealPlanResponse
 from app.high_risk_list import PREGNANCY_HIGH_RISK, BABY_HIGH_RISK
-from app.rag_chain import life_stage_note
+from app.rag_chain import language_note, life_stage_note
 
 router = APIRouter(prefix="/meal-plan", tags=["meal-plan"])
 client = OpenAI(api_key=settings.openai_api_key)
@@ -41,9 +41,28 @@ Respond ONLY with valid JSON matching this exact shape, no markdown, no preamble
       "dinner": {{"name": string, "description": string, "why_good": string}},
       "snack": {{"name": string, "description": string, "why_good": string}}
     }}
+  ],
+  "grocery_list": [
+    {{"name": string, "quantity": string, "section": string}}
   ]
 }}
+
+GROCERY RULE: "grocery_list" is everything needed to cook the WHOLE plan,
+combined across all days - one entry per ingredient, never repeated. Give
+"quantity" as a total in shopping units ("2 bunches", "500 g", "1 dozen").
+Leave out water, salt, and cooking oil. "section" must be exactly one of:
+{sections}.
 """
+
+GROCERY_SECTIONS = [
+    "Produce",
+    "Dairy & eggs",
+    "Meat & fish",
+    "Grains & bread",
+    "Pantry",
+    "Frozen",
+    "Other",
+]
 
 
 @router.post("", response_model=MealPlanResponse)
@@ -79,12 +98,23 @@ def generate_meal_plan(req: MealPlanRequest):
     if conditions:
         profile_note += f" Medical conditions the plan must manage: {', '.join(conditions)}."
 
+    language = language_note(req.profile)
+    if language:
+        # Sections stay in English: the app groups and orders by them.
+        profile_note += f"\n{language} The grocery \"section\" values count as fixed options."
+
     user_prompt = f"{profile_note}\nGenerate a {req.days}-day meal plan."
 
     completion = client.chat.completions.create(
         model=settings.chat_model,
         messages=[
-            {"role": "system", "content": SYSTEM_PROMPT.format(avoid_list=", ".join(avoid_list))},
+            {
+                "role": "system",
+                "content": SYSTEM_PROMPT.format(
+                    avoid_list=", ".join(avoid_list),
+                    sections=", ".join(GROCERY_SECTIONS),
+                ),
+            },
             {"role": "user", "content": user_prompt},
         ],
         temperature=0.7,
@@ -92,4 +122,9 @@ def generate_meal_plan(req: MealPlanRequest):
     )
 
     raw = json.loads(completion.choices[0].message.content)
-    return MealPlanResponse(**raw)
+    plan = MealPlanResponse(**raw)
+    # A section outside the list would put the item in a group of its own.
+    for item in plan.grocery_list:
+        if item.section not in GROCERY_SECTIONS:
+            item.section = "Other"
+    return plan

@@ -37,6 +37,16 @@ class Settings(BaseSettings):
     # inference budget.
     allowed_origins: str = "*"
 
+    # ---- Abuse protection ----
+    #
+    # AI requests (POSTs) allowed per client IP. Generous for a person using
+    # the app - a busy session is a handful of questions a minute - and far
+    # below what a script would need to run up a real bill. See rate_limit.py.
+    rate_limit_per_minute: int = 20
+    rate_limit_per_day: int = 300
+    # Photos, voice notes and PDF reports. Anything bigger is not a meal photo.
+    max_upload_mb: int = 10
+
     # ---- Cloud sync (optional) ----
     #
     # Empty means sync is switched off and the endpoints answer 501. The app

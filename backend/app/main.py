@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
+from app.rate_limit import AbuseProtectionMiddleware, RateLimiter
 
 from app.routers import (
     assistant,
@@ -30,10 +31,19 @@ app = FastAPI(
 # Origins come from ALLOWED_ORIGINS. Wide open by default so local development
 # works out of the box; set the env var on your deployment.
 app.add_middleware(
+    AbuseProtectionMiddleware,
+    limiter=RateLimiter(settings.rate_limit_per_minute, settings.rate_limit_per_day),
+    max_body_bytes=settings.max_upload_mb * 1024 * 1024,
+)
+# Added last so it is outermost: preflight OPTIONS requests are answered here
+# and never reach the rate limiter.
+app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
+    # Lets the web app read how long to wait after a 429.
+    expose_headers=["Retry-After"],
 )
 
 app.include_router(chat.router)

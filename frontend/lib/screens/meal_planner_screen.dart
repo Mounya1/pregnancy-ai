@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/meal_plan.dart';
 import '../services/api_client.dart';
@@ -233,11 +234,121 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
                 // A regenerated shorter plan can leave the old index dangling.
                 day: plan.days[_selectedDay.clamp(0, plan.days.length - 1)],
               ),
+            if (plan.groceryList.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.lg),
+              _GroceryList(
+                plan: plan,
+                onToggle: (item) {
+                  setState(() => item.checked = !item.checked);
+                  _storage.saveLastMealPlan(plan.toJson());
+                },
+              ),
+            ],
             const SizedBox(height: AppSpacing.lg),
             Text(
               plan.disclaimer,
               style: TextStyle(fontSize: 10, height: 1.4, color: p.textMuted),
             ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Everything to buy for the whole plan, grouped by aisle, ticked off while
+/// shopping. Copy puts it on the clipboard for a notes app or a message.
+class _GroceryList extends StatelessWidget {
+  const _GroceryList({required this.plan, required this.onToggle});
+
+  final MealPlan plan;
+  final ValueChanged<GroceryItem> onToggle;
+
+  Future<void> _copy(BuildContext context) async {
+    await Clipboard.setData(ClipboardData(text: plan.groceryListAsText()));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Grocery list copied')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final done = plan.groceryList.where((g) => g.checked).length;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.shopping_cart_rounded, size: 17, color: p.brandSoft),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(child: Text('Grocery list', style: context.texts.titleSmall)),
+              Text(
+                '$done of ${plan.groceryList.length}',
+                style: TextStyle(fontSize: 11.5, color: p.textMuted),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              IconButton(
+                tooltip: 'Copy list',
+                visualDensity: VisualDensity.compact,
+                icon: Icon(Icons.copy_rounded, size: 17, color: p.textSecondary),
+                onPressed: () => _copy(context),
+              ),
+            ],
+          ),
+          Text(
+            'Everything for the whole plan',
+            style: TextStyle(fontSize: 11.5, color: p.textMuted),
+          ),
+          for (final (section, items) in plan.groceriesBySection) ...[
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              section.toUpperCase(),
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1,
+                color: p.textMuted,
+              ),
+            ),
+            for (final item in items)
+              InkWell(
+                onTap: () => onToggle(item),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                  child: Row(
+                    children: [
+                      Icon(
+                        item.checked
+                            ? Icons.check_circle_rounded
+                            : Icons.radio_button_unchecked_rounded,
+                        size: 19,
+                        color: item.checked ? p.safe : p.textMuted,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Text(
+                          item.name,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: item.checked ? p.textMuted : null,
+                            decoration: item.checked ? TextDecoration.lineThrough : null,
+                          ),
+                        ),
+                      ),
+                      if (item.quantity.isNotEmpty)
+                        Text(
+                          item.quantity,
+                          style: TextStyle(fontSize: 11.5, color: p.textSecondary),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
           ],
         ],
       ),

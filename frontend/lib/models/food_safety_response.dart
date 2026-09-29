@@ -44,6 +44,11 @@ class FoodSafetyResponse {
   final List<String> betterAlternatives;
   final List<String> sources;
   final bool isHighRiskOverride;
+
+  /// The app's sourced library did not cover this food, so the answer comes
+  /// from general nutrition knowledge. Shown on the card so it is never
+  /// mistaken for guidance from a named source.
+  final bool fromGeneralKnowledge;
   final String disclaimer;
 
   FoodSafetyResponse({
@@ -57,6 +62,7 @@ class FoodSafetyResponse {
     this.betterAlternatives = const [],
     this.sources = const [],
     this.isHighRiskOverride = false,
+    this.fromGeneralKnowledge = false,
     this.disclaimer = 'This is not medical advice. Consult your doctor or pediatrician.',
   });
 
@@ -72,6 +78,7 @@ class FoodSafetyResponse {
       betterAlternatives: List<String>.from(json['better_alternatives'] ?? const []),
       sources: List<String>.from(json['sources'] ?? const []),
       isHighRiskOverride: json['is_high_risk_override'] as bool? ?? false,
+      fromGeneralKnowledge: json['from_general_knowledge'] as bool? ?? false,
       disclaimer: json['disclaimer'] as String? ??
           'This is not medical advice. Consult your doctor or pediatrician.',
     );

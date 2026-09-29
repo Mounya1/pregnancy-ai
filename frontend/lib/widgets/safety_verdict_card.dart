@@ -100,6 +100,25 @@ class SafetyVerdictCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (result.fromGeneralKnowledge) ...[
+                    Row(
+                      children: [
+                        Icon(Icons.info_outline_rounded, size: 13, color: p.textMuted),
+                        const SizedBox(width: AppSpacing.xs + 2),
+                        Expanded(
+                          child: Text(
+                            "General guidance - not from the app's sourced library",
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: p.textMuted,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                  ],
                   Text(result.explanation, style: context.texts.bodyMedium),
                   if (result.benefits.isNotEmpty) ...[
                     const SizedBox(height: AppSpacing.lg),
@@ -152,7 +171,15 @@ class SafetyVerdictCard extends StatelessWidget {
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.verified_rounded, size: 11, color: p.textMuted),
+                                    // The tick means "a named source said this";
+                                    // general knowledge does not get one.
+                                    Icon(
+                                      result.fromGeneralKnowledge
+                                          ? Icons.info_outline_rounded
+                                          : Icons.verified_rounded,
+                                      size: 11,
+                                      color: p.textMuted,
+                                    ),
                                     const SizedBox(width: 4),
                                     Text(
                                       s,

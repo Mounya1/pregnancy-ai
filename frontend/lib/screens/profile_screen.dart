@@ -86,32 +86,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Wrap(
               spacing: AppSpacing.sm,
               runSpacing: AppSpacing.sm,
-              children: Gender.values.map((gender) {
-                final selected = profile.gender == gender;
-                return Pressable(
-                  onTap: () => controller.update((profile) => profile.copyWith(gender: gender)),
-                  child: AnimatedContainer(
-                    duration: AppMotion.fast,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.lg,
-                      vertical: AppSpacing.md - 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: selected ? p.brand : p.surface,
-                      borderRadius: BorderRadius.circular(AppRadius.pill),
-                      border: Border.all(color: selected ? p.brand : p.border),
-                    ),
-                    child: Text(
-                      genderLabel(gender),
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: selected ? p.onBrand : p.textSecondary,
-                      ),
-                    ),
+              children: [
+                for (final gender in Gender.values)
+                  _ChoiceChip(
+                    label: genderLabel(gender),
+                    selected: profile.gender == gender,
+                    onTap: () =>
+                        controller.update((profile) => profile.copyWith(gender: gender)),
                   ),
-                );
-              }).toList(),
+              ],
             ),
           ],
           if (profile.lifeStage == LifeStage.pregnancy) ...[
@@ -272,6 +255,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 dietaryPreferences:
                     profile.dietaryPreferences.where((t) => t != tag).toList())),
           ),
+          const SizedBox(height: AppSpacing.xxl),
+          const SectionHeader(
+            title: 'Answer language',
+            subtitle: 'The language the assistant, meal plans and reports reply in',
+          ),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              for (final language in kAnswerLanguages)
+                _ChoiceChip(
+                  label: language,
+                  selected: profile.language == language,
+                  onTap: () =>
+                      controller.update((profile) => profile.copyWith(language: language)),
+                ),
+            ],
+          ),
           const SizedBox(height: AppSpacing.xl),
           Row(
             children: [
@@ -337,6 +338,44 @@ class _ProfileHeader extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// A single-choice pill, filled when selected - the same look as the life
+/// stage picker at the top of the screen.
+class _ChoiceChip extends StatelessWidget {
+  const _ChoiceChip({required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Pressable(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: AppMotion.fast,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg,
+          vertical: AppSpacing.md - 2,
+        ),
+        decoration: BoxDecoration(
+          color: selected ? p.brand : p.surface,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          border: Border.all(color: selected ? p.brand : p.border),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: selected ? p.onBrand : p.textSecondary,
+          ),
+        ),
       ),
     );
   }

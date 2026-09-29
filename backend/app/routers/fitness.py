@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from openai import OpenAI
 
 from app.config import settings
+from app.rag_chain import language_note
 from app.schemas import FitnessPlanRequest, FitnessPlanResponse, Gender, LifeStage
 
 router = APIRouter(prefix="/fitness-plan", tags=["fitness"])
@@ -81,6 +82,10 @@ def generate_fitness_plan(req: FitnessPlanRequest):
         note += f" Medical conditions to work around: {', '.join(conditions)}."
     if req.constraints:
         note += f" Practical constraints: {', '.join(req.constraints)}."
+
+    language = language_note(profile)
+    if language:
+        note += f"\n{language} The \"intensity\" values count as fixed options."
 
     user_prompt = f"{note}\nBuild a {req.days}-day plan."
 

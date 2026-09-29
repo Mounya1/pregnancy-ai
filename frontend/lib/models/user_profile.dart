@@ -53,6 +53,24 @@ String genderLabel(Gender g) {
   }
 }
 
+/// Languages the AI can answer in, by English name - the backend passes the
+/// name straight to the model. Offered as a fixed list so every choice is
+/// one the model writes well.
+const kAnswerLanguages = [
+  'English',
+  'Hindi',
+  'Telugu',
+  'Tamil',
+  'Kannada',
+  'Marathi',
+  'Bengali',
+  'Spanish',
+  'French',
+  'Portuguese',
+  'Arabic',
+  'Chinese',
+];
+
 String lifeStageToApiString(LifeStage s) {
   switch (s) {
     case LifeStage.pregnancy:
@@ -128,6 +146,10 @@ class UserProfile {
   /// The user's own gender. See [Gender].
   Gender gender;
 
+  /// Language the AI answers in. Only the AI's replies change - the app's
+  /// own labels stay in English.
+  String language;
+
   UserProfile({
     this.lifeStage = LifeStage.general,
     this.dueDate,
@@ -138,6 +160,7 @@ class UserProfile {
     this.healthConditions = const [],
     this.babyGender = BabyGender.unspecified,
     this.gender = Gender.unspecified,
+    this.language = 'English',
   });
 
   /// The gender that actually applies: whatever was picked in General mode,
@@ -173,6 +196,7 @@ class UserProfile {
         'cuisines': cuisines,
         'health_conditions': healthConditions,
         'gender': effectiveGender.name,
+        'language': language,
       };
 
   Map<String, dynamic> toStorageJson() => {
@@ -185,6 +209,7 @@ class UserProfile {
         'health_conditions': healthConditions,
         'baby_gender': babyGender.name,
         'gender': gender.name,
+        'language': language,
       };
 
   factory UserProfile.fromStorageJson(Map<String, dynamic> json) {
@@ -199,6 +224,7 @@ class UserProfile {
       healthConditions: List<String>.from(json['health_conditions'] ?? const []),
       babyGender: babyGenderFromString(json['baby_gender'] as String?),
       gender: genderFromString(json['gender'] as String?),
+      language: kAnswerLanguages.contains(json['language']) ? json['language'] as String : 'English',
     );
   }
 
@@ -229,6 +255,7 @@ class UserProfile {
     List<String>? healthConditions,
     BabyGender? babyGender,
     Gender? gender,
+    String? language,
   }) {
     return UserProfile(
       lifeStage: lifeStage ?? this.lifeStage,
@@ -240,6 +267,7 @@ class UserProfile {
       healthConditions: healthConditions ?? this.healthConditions,
       babyGender: babyGender ?? this.babyGender,
       gender: gender ?? this.gender,
+      language: language ?? this.language,
     );
   }
 }

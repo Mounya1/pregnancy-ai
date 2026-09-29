@@ -10,6 +10,7 @@ import 'package:pregnancy_ai_assistant/models/baby_record.dart';
 import 'package:pregnancy_ai_assistant/models/care_plan.dart';
 import 'package:pregnancy_ai_assistant/models/doctor_note.dart';
 import 'package:pregnancy_ai_assistant/models/emergency_contact.dart';
+import 'package:pregnancy_ai_assistant/models/meal_plan.dart';
 import 'package:pregnancy_ai_assistant/models/milestone.dart';
 import 'package:pregnancy_ai_assistant/models/nutrition_log.dart';
 import 'package:pregnancy_ai_assistant/models/pregnancy_week.dart';
@@ -559,6 +560,36 @@ void main() {
       stageHeroImage(UserProfile(lifeStage: LifeStage.pregnancy)),
       'assets/images/hero_pregnancy.jpg',
     );
+  });
+
+  test('meal plan grocery list groups by aisle and keeps ticks', () {
+    final plan = MealPlan.fromJson({
+      'summary': 's',
+      'days': [],
+      'grocery_list': [
+        {'name': 'Paneer', 'quantity': '200 g', 'section': 'Dairy & eggs'},
+        {'name': 'Spinach', 'quantity': '2 bunches', 'section': 'Produce'},
+        {'name': 'Mystery', 'section': 'Spices'},
+      ],
+    });
+    // Shop order, and an unknown aisle falls into Other rather than vanishing.
+    expect(plan.groceriesBySection.map((s) => s.$1), ['Produce', 'Dairy & eggs', 'Other']);
+
+    plan.groceryList.first.checked = true;
+    final reloaded = MealPlan.fromJson(plan.toJson());
+    expect(reloaded.groceryList.first.checked, isTrue);
+    expect(reloaded.groceryListAsText(), contains('[x] Paneer - 200 g'));
+
+    // Plans saved before grocery lists existed still load.
+    expect(MealPlan.fromJson({'summary': 's', 'days': []}).groceryList, isEmpty);
+  });
+
+  test('answer language is sent to the API and survives a reload', () {
+    final profile = UserProfile(language: 'Telugu');
+    expect(profile.toApiJson()['language'], 'Telugu');
+    expect(UserProfile.fromStorageJson(profile.toStorageJson()).language, 'Telugu');
+    // Anything outside the offered list falls back rather than reaching the model.
+    expect(UserProfile.fromStorageJson({'language': 'Klingon'}).language, 'English');
   });
 
   test('baby weight is read against an age-appropriate range', () {

@@ -49,6 +49,11 @@ class UserProfile(BaseModel):
     # Usually populated from an uploaded report via /medical-report.
     health_conditions: List[str] = Field(default_factory=list)
     gender: Gender = Gender.UNSPECIFIED
+    # Language the AI writes its answers in, by English name ("Hindi",
+    # "Spanish"). Free text so the app can offer any language the model
+    # writes well without a backend change; capped so it cannot carry a
+    # smuggled prompt.
+    language: str = Field("English", max_length=30)
 
 
 class FoodSafetyResponse(BaseModel):
@@ -66,6 +71,10 @@ class FoodSafetyResponse(BaseModel):
     better_alternatives: List[str] = Field(default_factory=list)
     sources: List[str] = Field(default_factory=list)
     is_high_risk_override: bool = False
+    # True when the knowledge base did not cover the food and the answer comes
+    # from general nutrition knowledge instead - shown to the user as such, so
+    # an everyday food gets an answer without it passing as sourced guidance.
+    from_general_knowledge: bool = False
     disclaimer: str = "This is not medical advice. Consult your doctor or pediatrician."
 
 
@@ -169,9 +178,18 @@ class MealPlanRequest(BaseModel):
     health_conditions: List[str] = Field(default_factory=list)
 
 
+class GroceryItem(BaseModel):
+    name: str              # "Spinach"
+    quantity: str = ""     # "2 bunches" - whole-plan total, shopping units
+    section: str = "Other"  # store aisle, so the list can be grouped
+
+
 class MealPlanResponse(BaseModel):
     summary: str  # 1-2 sentence overview of the plan's nutritional focus
     days: List[DayPlan]
+    # Everything needed to cook the whole plan. Empty on plans saved before
+    # this field existed.
+    grocery_list: List[GroceryItem] = Field(default_factory=list)
     disclaimer: str = "This is not medical advice. Consult your doctor or a registered dietitian."
 
 

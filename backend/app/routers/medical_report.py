@@ -5,6 +5,7 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from openai import OpenAI
 
 from app.config import settings
+from app.rag_chain import language_note
 from app.schemas import MedicalReportResponse, UserProfile
 
 router = APIRouter(prefix="/medical-report", tags=["medical-report"])
@@ -77,6 +78,9 @@ def _profile_note(profile: UserProfile) -> str:
         note += f" Allergies: {', '.join(profile.allergies)}."
     if profile.dietary_preferences:
         note += f" Dietary preferences: {', '.join(profile.dietary_preferences)}."
+    language = language_note(profile)
+    if language:
+        note += f"\n{language}"
     return note
 
 
