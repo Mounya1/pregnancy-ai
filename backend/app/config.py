@@ -21,6 +21,9 @@ class Settings(BaseSettings):
         """
         return value.strip().strip('"').strip("'")
     chat_model: str = "gpt-4o"
+    # Only decides whether a chat message is a food question or a general
+    # health one - a one-word job that does not need the big model.
+    router_model: str = "gpt-4o-mini"
     vision_model: str = "gpt-4o"
     embedding_model: str = "text-embedding-3-small"
     tts_model: str = "tts-1"

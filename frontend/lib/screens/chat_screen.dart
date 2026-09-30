@@ -90,8 +90,8 @@ class _ChatScreenState extends State<ChatScreen> {
   static const _starters = [
     'Is sushi safe right now?',
     'How much coffee can I have?',
-    'Can I eat soft cheese?',
-    'Best foods for iron?',
+    'What should my daily routine look like?',
+    'How can I sleep better?',
   ];
 
   @override
@@ -119,8 +119,19 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
+  /// The last few turns as (role, text), oldest first, for follow-ups.
+  List<(String, String)> _recentTurns() {
+    final turns = <(String, String)>[];
+    for (final entry in _entries) {
+      if (entry is _UserMessage) turns.add(('user', entry.text));
+      if (entry is _AssistantMessage) turns.add(('assistant', entry.response.replyText));
+    }
+    return turns.length > 6 ? turns.sublist(turns.length - 6) : turns;
+  }
+
   Future<void> _send(String text) async {
     if (text.trim().isEmpty) return;
+    final history = _recentTurns();
     setState(() {
       _entries.add(_UserMessage(text));
       _loading = true;
@@ -129,15 +140,23 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
 
     try {
-      final response = await _api.chat(message: text, profile: widget.profile);
+      final response = await _api.chat(
+        message: text,
+        profile: widget.profile,
+        history: history,
+      );
       setState(() => _entries.add(_AssistantMessage(response, text)));
-      await _storage.logHistory(HistoryEntry(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
-        query: text,
-        motherResult: response.structured,
-        babyResult: response.babyStructured,
-        source: HistorySource.chat,
-      ));
+      // History is the food-lookup log; a health answer has no verdict to file.
+      final structured = response.structured;
+      if (structured != null) {
+        await _storage.logHistory(HistoryEntry(
+          id: DateTime.now().microsecondsSinceEpoch.toString(),
+          query: text,
+          motherResult: structured,
+          babyResult: response.babyStructured,
+          source: HistorySource.chat,
+        ));
+      }
     } catch (e) {
       final message = describeApiError(e, baseUrl: _api.baseUrl);
       setState(() => _entries.add(_AssistantMessage(
@@ -252,15 +271,20 @@ class _ChatScreenState extends State<ChatScreen> {
           profile: widget.profile,
           filename: 'question.wav',
         );
-        setState(() => _entries.add(_AssistantMessage(response, response.structured.foodName)));
-        await _storage.logHistory(HistoryEntry(
-          id: DateTime.now().microsecondsSinceEpoch.toString(),
-          query: response.structured.foodName,
-          motherResult: response.structured,
-          babyResult: response.babyStructured,
-          source: HistorySource.voice,
-        ));
-        await _tts.speak(response.structured.explanation);
+        final structured = response.structured;
+        setState(() => _entries.add(
+              _AssistantMessage(response, structured?.foodName ?? 'voice question'),
+            ));
+        if (structured != null) {
+          await _storage.logHistory(HistoryEntry(
+            id: DateTime.now().microsecondsSinceEpoch.toString(),
+            query: structured.foodName,
+            motherResult: structured,
+            babyResult: response.babyStructured,
+            source: HistorySource.voice,
+          ));
+        }
+        await _tts.speak(structured?.explanation ?? response.replyText);
       } catch (e) {
         final message = describeApiError(e, baseUrl: _api.baseUrl);
         setState(() => _entries.add(_AssistantMessage(
@@ -408,15 +432,24 @@ class _ChatScreenState extends State<ChatScreen> {
                         );
                       }
                       if (entry is _AssistantMessage) {
+                        final structured = entry.response.structured;
                         return Padding(
                           padding: const EdgeInsets.only(bottom: AppSpacing.lg),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              if (structured == null)
+                                Reveal(
+                                  child: _HealthAnswerBubble(
+                                    text: entry.response.replyText,
+                                    onListen: () => _tts.speak(entry.response.replyText),
+                                  ),
+                                )
+                              else
                               DualVerdictSection(
-                                motherResult: entry.response.structured,
+                                motherResult: structured,
                                 babyResult: entry.response.babyStructured,
-                                onListenMother: () => _tts.speak(entry.response.structured.explanation),
+                                onListenMother: () => _tts.speak(structured.explanation),
                                 onListenBaby: entry.response.babyStructured != null
                                     ? () => _tts.speak(entry.response.babyStructured!.explanation)
                                     : null,
@@ -425,7 +458,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                   await _storage.saveFoodBookmark(SavedFood(
                                     id: DateTime.now().microsecondsSinceEpoch.toString(),
                                     foodName: entry.query,
-                                    motherResult: entry.response.structured,
+                                    motherResult: structured,
                                     babyResult: entry.response.babyStructured,
                                   ));
                                   setState(() => _savedEntryIndices.add(i));
@@ -494,7 +527,7 @@ class _ChatIntro extends StatelessWidget {
         Reveal(
           delay: const Duration(milliseconds: 80),
           child: Text(
-            'Ask me anything about food',
+            'Ask me anything about your health',
             textAlign: TextAlign.center,
             style: context.texts.titleLarge,
           ),
@@ -503,7 +536,8 @@ class _ChatIntro extends StatelessWidget {
         Reveal(
           delay: const Duration(milliseconds: 120),
           child: Text(
-            'Every answer is checked against ACOG, CDC, FDA, NIH, and AAP guidance for your life stage.',
+            'Food, sleep, exercise, symptoms, your daily routine - answered for your '
+            'life stage, with ACOG, CDC, FDA, NIH, and AAP guidance behind food answers.',
             textAlign: TextAlign.center,
             style: context.texts.bodySmall?.copyWith(color: p.textMuted),
           ),
@@ -538,6 +572,56 @@ class _ChatIntro extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// An everyday health answer - sleep, exercise, symptoms, routine - as a
+/// normal chat reply. Food questions get verdict cards instead; this has no
+/// single food to rule on.
+class _HealthAnswerBubble extends StatelessWidget {
+  const _HealthAnswerBubble({required this.text, required this.onListen});
+
+  final String text;
+  final VoidCallback onListen;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Container(
+      margin: const EdgeInsets.only(right: AppSpacing.xxl),
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: p.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg).copyWith(
+          bottomLeft: const Radius.circular(AppSpacing.xs),
+        ),
+        border: Border.all(color: p.border),
+        boxShadow: p.softShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SelectableText(text, style: context.texts.bodyMedium?.copyWith(height: 1.5)),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'General guidance, not a diagnosis.',
+                  style: TextStyle(fontSize: 10.5, color: p.textMuted),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Listen',
+                visualDensity: VisualDensity.compact,
+                icon: Icon(Icons.volume_up_rounded, size: 18, color: p.textSecondary),
+                onPressed: onListen,
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

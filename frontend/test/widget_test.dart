@@ -10,6 +10,7 @@ import 'package:pregnancy_ai_assistant/models/baby_record.dart';
 import 'package:pregnancy_ai_assistant/models/care_plan.dart';
 import 'package:pregnancy_ai_assistant/models/doctor_note.dart';
 import 'package:pregnancy_ai_assistant/models/emergency_contact.dart';
+import 'package:pregnancy_ai_assistant/models/food_safety_response.dart';
 import 'package:pregnancy_ai_assistant/models/meal_plan.dart';
 import 'package:pregnancy_ai_assistant/models/medical_report.dart';
 import 'package:pregnancy_ai_assistant/models/milestone.dart';
@@ -605,6 +606,23 @@ void main() {
     final profile = UserProfile(reportNotes: notes);
     expect(profile.toApiJson()['report_notes'], notes);
     expect(UserProfile.fromStorageJson(profile.toStorageJson()).reportNotes, notes);
+  });
+
+  test('a health answer parses without a food verdict', () {
+    final health = ChatResponse.fromJson({
+      'reply_text': 'Aim for 7-9 hours.',
+      'kind': 'health',
+      'structured': null,
+      'suggested_followups': ['How can I sleep better?'],
+    });
+    expect(health.isHealthAnswer, isTrue);
+    expect(health.replyText, 'Aim for 7-9 hours.');
+
+    final food = ChatResponse.fromJson({
+      'reply_text': 'Yes.',
+      'structured': {'food_name': 'dates', 'verdict': 'Safe', 'explanation': 'Yes.'},
+    });
+    expect(food.isHealthAnswer, isFalse);
   });
 
   test('answer language is sent to the API and survives a reload', () {

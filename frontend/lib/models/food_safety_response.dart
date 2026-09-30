@@ -92,23 +92,32 @@ class FoodSafetyResponse {
 }
 
 /// Mirrors app/schemas.py: ChatResponse
+///
+/// A food question comes back with a verdict in [structured]. Any other
+/// health question comes back as a plain conversational answer in
+/// [replyText], with [structured] null.
 class ChatResponse {
   final String replyText;
-  final FoodSafetyResponse structured;
+  final FoodSafetyResponse? structured;
   final FoodSafetyResponse? babyStructured;
   final List<String> suggestedFollowups;
 
   ChatResponse({
     required this.replyText,
-    required this.structured,
+    this.structured,
     this.babyStructured,
     this.suggestedFollowups = const [],
   });
 
+  /// True for an everyday health answer rather than a food verdict.
+  bool get isHealthAnswer => structured == null;
+
   factory ChatResponse.fromJson(Map<String, dynamic> json) {
     return ChatResponse(
       replyText: json['reply_text'] as String,
-      structured: FoodSafetyResponse.fromJson(json['structured']),
+      structured: json['structured'] != null
+          ? FoodSafetyResponse.fromJson(json['structured'])
+          : null,
       babyStructured: json['baby_structured'] != null
           ? FoodSafetyResponse.fromJson(json['baby_structured'])
           : null,

@@ -3,8 +3,8 @@ from fastapi import APIRouter, UploadFile, File, Form
 from openai import OpenAI
 
 from app.config import settings
-from app.schemas import VoiceResponse, ChatResponse, UserProfile
-from app.rag_chain import analyze_food, generate_followups
+from app.schemas import VoiceResponse, UserProfile
+from app.routers.chat import respond
 
 router = APIRouter(prefix="/voice", tags=["voice"])
 client = OpenAI(api_key=settings.openai_api_key)
@@ -24,14 +24,8 @@ async def voice_query(
     )
     transcript = transcript_resp.text
 
-    # 2. Run through the same RAG pipeline as text chat
-    mother_result, baby_result = analyze_food(transcript, profile=profile)
-    chat_response = ChatResponse(
-        reply_text=mother_result.explanation,
-        structured=mother_result,
-        baby_structured=baby_result,
-        suggested_followups=generate_followups(transcript, profile),
-    )
+    # 2. Answer exactly as the text chat would - food verdict or health reply
+    chat_response = respond(transcript, profile)
 
     # No audio generated here - the frontend calls GET /tts?text=... separately
     # to speak the reply, reusing the same mechanism as the "Listen to

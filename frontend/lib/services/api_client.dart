@@ -37,10 +37,19 @@ class ApiClient {
   // For the deployed demo, build with:
   //   flutter build web --dart-define=API_BASE_URL=https://your-backend.onrender.com
 
-  Future<ChatResponse> chat({required String message, required UserProfile profile}) async {
+  /// [history] is the recent conversation as (role, text) pairs, oldest
+  /// first, so follow-ups like "and at night?" can be understood.
+  Future<ChatResponse> chat({
+    required String message,
+    required UserProfile profile,
+    List<(String, String)> history = const [],
+  }) async {
     final res = await _dio.post('/chat', data: {
       'message': message,
       'profile': profile.toApiJson(),
+      'history': [
+        for (final (role, content) in history) {'role': role, 'content': content},
+      ],
     });
     return ChatResponse.fromJson(res.data as Map<String, dynamic>);
   }

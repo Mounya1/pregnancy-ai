@@ -90,14 +90,20 @@ class FoodSafetyResponse(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str = Field(..., max_length=2000)
     profile: UserProfile = Field(default_factory=UserProfile)
     user_id: Optional[str] = None
+    # Recent turns, so a follow-up like "and at night?" can be understood.
+    # Only the last few are used; capped so it cannot grow the bill.
+    history: List["AssistantMessage"] = Field(default_factory=list, max_length=20)
 
 
 class ChatResponse(BaseModel):
     reply_text: str
-    structured: FoodSafetyResponse
+    # "food": a verdict card in `structured`. "health": an everyday health
+    # answer, conversational, in `reply_text` only.
+    kind: str = "food"
+    structured: Optional[FoodSafetyResponse] = None
     # populated only when life_stage involves a baby AND the food is relevant to feeding the baby
     # directly (solids/weaning) rather than just the mother's diet
     baby_structured: Optional[FoodSafetyResponse] = None
@@ -342,3 +348,7 @@ class TipsRequest(BaseModel):
 
 class TipsResponse(BaseModel):
     tips: List[WellnessTip] = Field(default_factory=list)
+
+
+# ChatRequest refers to AssistantMessage, which is defined further down.
+ChatRequest.model_rebuild()
