@@ -1,6 +1,6 @@
 from enum import Enum
-from typing import List, Optional
-from pydantic import BaseModel, Field
+from typing import Annotated, List, Optional
+from pydantic import BaseModel, Field, StringConstraints
 
 
 class SafetyVerdict(str, Enum):
@@ -54,6 +54,14 @@ class UserProfile(BaseModel):
     # writes well without a backend change; capped so it cannot carry a
     # smuggled prompt.
     language: str = Field("English", max_length=30)
+    # Short lines distilled from the user's uploaded reports by the app, e.g.
+    # "Haemoglobin 9.4 g/dL (low)" or "Report says to limit: sweets". Kept
+    # separate from health_conditions because these are the actual values,
+    # which is what lets an answer say "your iron is low, so...". Capped in
+    # count and length - it goes into every prompt.
+    report_notes: List[Annotated[str, StringConstraints(max_length=200)]] = Field(
+        default_factory=list, max_length=20
+    )
 
 
 class FoodSafetyResponse(BaseModel):
@@ -75,6 +83,9 @@ class FoodSafetyResponse(BaseModel):
     # from general nutrition knowledge instead - shown to the user as such, so
     # an everyday food gets an answer without it passing as sourced guidance.
     from_general_knowledge: bool = False
+    # The answer is a best effort the user should confirm with a clinician.
+    # Shown as a note under the answer, never instead of it.
+    consult_doctor: bool = False
     disclaimer: str = "This is not medical advice. Consult your doctor or pediatrician."
 
 

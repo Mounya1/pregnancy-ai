@@ -59,6 +59,33 @@ class ReportFinding {
 /// The parsed result of uploading a lab report or doctor's summary. The
 /// [conditions] list is what feeds back into the profile so meal plans and
 /// chat answers adapt to it.
+/// Short lines from the user's reports for the AI to take into account,
+/// newest report first: the values that are out of range, and what the
+/// report says to eat more or less of. Normal values are left out - they
+/// change no answer and only lengthen every prompt.
+///
+/// Capped to match the backend's limit on UserProfile.report_notes.
+List<String> reportNotesFrom(List<MedicalReport> reports) {
+  final sorted = [...reports]..sort((a, b) => b.uploadedAt.compareTo(a.uploadedAt));
+  final notes = <String>[];
+  for (final report in sorted) {
+    for (final f in report.findings) {
+      if (f.status == FindingStatus.low || f.status == FindingStatus.high) {
+        notes.add('${f.label} ${f.value} (${f.status.name})');
+      }
+    }
+    if (report.foodsToLimit.isNotEmpty) {
+      notes.add('Report says to limit: ${report.foodsToLimit.join(', ')}');
+    }
+    if (report.foodsToEmphasize.isNotEmpty) {
+      notes.add('Report says to eat more: ${report.foodsToEmphasize.join(', ')}');
+    }
+  }
+  return [
+    for (final n in notes.toSet().take(20)) n.length > 200 ? n.substring(0, 200) : n,
+  ];
+}
+
 class MedicalReport {
   MedicalReport({
     required this.id,

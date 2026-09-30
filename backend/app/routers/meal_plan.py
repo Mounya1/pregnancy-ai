@@ -97,6 +97,8 @@ def generate_meal_plan(req: MealPlanRequest):
     conditions = req.health_conditions or req.profile.health_conditions
     if conditions:
         profile_note += f" Medical conditions the plan must manage: {', '.join(conditions)}."
+    if req.profile.report_notes:
+        profile_note += " From the user's medical reports: " + "; ".join(req.profile.report_notes) + "."
 
     language = language_note(req.profile)
     if language:

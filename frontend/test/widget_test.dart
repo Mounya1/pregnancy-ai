@@ -11,6 +11,7 @@ import 'package:pregnancy_ai_assistant/models/care_plan.dart';
 import 'package:pregnancy_ai_assistant/models/doctor_note.dart';
 import 'package:pregnancy_ai_assistant/models/emergency_contact.dart';
 import 'package:pregnancy_ai_assistant/models/meal_plan.dart';
+import 'package:pregnancy_ai_assistant/models/medical_report.dart';
 import 'package:pregnancy_ai_assistant/models/milestone.dart';
 import 'package:pregnancy_ai_assistant/models/nutrition_log.dart';
 import 'package:pregnancy_ai_assistant/models/pregnancy_week.dart';
@@ -582,6 +583,28 @@ void main() {
 
     // Plans saved before grocery lists existed still load.
     expect(MealPlan.fromJson({'summary': 's', 'days': []}).groceryList, isEmpty);
+  });
+
+  test('report notes carry out-of-range values and diet advice, not normals', () {
+    final report = MedicalReport.fromJson({
+      'summary': 's',
+      'findings': [
+        {'label': 'Haemoglobin', 'value': '9.4 g/dL', 'status': 'low'},
+        {'label': 'Glucose', 'value': '90 mg/dL', 'status': 'normal'},
+      ],
+      'foods_to_limit': ['sweets'],
+      'foods_to_emphasize': ['spinach', 'lentils'],
+    });
+    final notes = reportNotesFrom([report]);
+    expect(notes, [
+      'Haemoglobin 9.4 g/dL (low)',
+      'Report says to limit: sweets',
+      'Report says to eat more: spinach, lentils',
+    ]);
+
+    final profile = UserProfile(reportNotes: notes);
+    expect(profile.toApiJson()['report_notes'], notes);
+    expect(UserProfile.fromStorageJson(profile.toStorageJson()).reportNotes, notes);
   });
 
   test('answer language is sent to the API and survives a reload', () {

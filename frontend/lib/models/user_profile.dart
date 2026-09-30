@@ -150,6 +150,10 @@ class UserProfile {
   /// own labels stay in English.
   String language;
 
+  /// Out-of-range values and diet advice from uploaded reports, so answers
+  /// can use them. Rebuilt from the saved reports - see reportNotesFrom().
+  List<String> reportNotes;
+
   UserProfile({
     this.lifeStage = LifeStage.general,
     this.dueDate,
@@ -161,6 +165,7 @@ class UserProfile {
     this.babyGender = BabyGender.unspecified,
     this.gender = Gender.unspecified,
     this.language = 'English',
+    this.reportNotes = const [],
   });
 
   /// The gender that actually applies: whatever was picked in General mode,
@@ -197,6 +202,7 @@ class UserProfile {
         'health_conditions': healthConditions,
         'gender': effectiveGender.name,
         'language': language,
+        'report_notes': reportNotes,
       };
 
   Map<String, dynamic> toStorageJson() => {
@@ -210,6 +216,7 @@ class UserProfile {
         'baby_gender': babyGender.name,
         'gender': gender.name,
         'language': language,
+        'report_notes': reportNotes,
       };
 
   factory UserProfile.fromStorageJson(Map<String, dynamic> json) {
@@ -225,6 +232,7 @@ class UserProfile {
       babyGender: babyGenderFromString(json['baby_gender'] as String?),
       gender: genderFromString(json['gender'] as String?),
       language: kAnswerLanguages.contains(json['language']) ? json['language'] as String : 'English',
+      reportNotes: List<String>.from(json['report_notes'] ?? const []),
     );
   }
 
@@ -256,6 +264,7 @@ class UserProfile {
     BabyGender? babyGender,
     Gender? gender,
     String? language,
+    List<String>? reportNotes,
   }) {
     return UserProfile(
       lifeStage: lifeStage ?? this.lifeStage,
@@ -268,6 +277,7 @@ class UserProfile {
       babyGender: babyGender ?? this.babyGender,
       gender: gender ?? this.gender,
       language: language ?? this.language,
+      reportNotes: reportNotes ?? this.reportNotes,
     );
   }
 }

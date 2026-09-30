@@ -85,6 +85,7 @@ class _MedicalReportScreenState extends State<MedicalReportScreen> {
       );
       await _storage.saveMedicalReport(report);
       await _applyConditions(report);
+      if (mounted) await context.read<ProfileController>().refreshReportNotes();
       await _load();
     } catch (e) {
       if (mounted) {
@@ -162,6 +163,7 @@ class _MedicalReportScreenState extends State<MedicalReportScreen> {
 
   Future<void> _delete(MedicalReport report) async {
     await _storage.removeMedicalReport(report.id);
+    if (mounted) await context.read<ProfileController>().refreshReportNotes();
     await _load();
   }
 

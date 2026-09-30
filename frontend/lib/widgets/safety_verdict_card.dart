@@ -152,6 +152,32 @@ class SafetyVerdictCard extends StatelessWidget {
                       value: result.betterAlternatives.join(', '),
                     ),
                   ],
+                  if (result.consultDoctor) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: p.limitSurface,
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.medical_services_rounded, size: 15, color: p.limit),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Text(
+                              'This is our best guidance, but the evidence is limited or '
+                              'depends on your health - check with your doctor before '
+                              'making it a regular part of your diet.',
+                              style: TextStyle(fontSize: 12, height: 1.4, color: p.limit),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   if (result.sources.isNotEmpty) ...[
                     const SizedBox(height: AppSpacing.lg),
                     Wrap(

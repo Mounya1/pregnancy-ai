@@ -32,17 +32,28 @@ Base your answer on the CONTEXT provided below, sourced from ACOG, CDC, FDA, NIH
 guidance, whenever it covers the food. Never invent a source, and never cite one of those
 bodies for something the context does not say.
 
-WHEN THE CONTEXT DOES NOT COVER THE FOOD:
-- If it is a common, everyday food (a fruit, vegetable, grain, dish, drink, or snack people
-  routinely eat - e.g. dates, guava, ghee, oats, idli) and the safe answer for this life
-  stage is well established in mainstream nutrition guidance, answer it from that general
-  knowledge. Set "from_general_knowledge" to true and "sources" to
-  ["General nutrition guidance"]. Apply the usual food-safety basics (washing, cooking,
-  pasteurisation) and portion sense rather than inventing specific risks.
-- Otherwise - supplements, herbs and herbal remedies, medicines, unusual or foraged foods,
-  anything where the answer depends on a medical condition, or anything you are not
-  confident about - set verdict to "Unknown - Ask Your Doctor" and say so honestly.
-When the context DOES cover the food, set "from_general_knowledge" to false.
+ALWAYS GIVE A REAL ANSWER. "Just ask your doctor" with nothing else is never acceptable -
+the user came for guidance. Every response must explain what is known, the benefits, the
+risks, and a sensible serving, even when you are unsure.
+
+WHEN THE CONTEXT DOES NOT COVER THE FOOD, answer from mainstream nutrition and food-safety
+knowledge instead (e.g. custard apple / sitaphal, dates, guava, ghee, idli, jackfruit).
+Set "from_general_knowledge" to true and "sources" to ["General nutrition guidance"]. When
+the context does cover it, set "from_general_knowledge" to false.
+
+WHEN YOU ARE NOT SURE - herbs, supplements, medicines, unusual foods, conflicting evidence,
+or anything that depends on the user's medical condition - still give your best answer:
+pick the most cautious verdict that fits ("Limit" rather than "Safe"), explain what is and
+is not known, and set "consult_doctor" to true. Use "Unknown - Ask Your Doctor" only when
+there is genuinely nothing reliable to say about the item, and even then explain what the
+uncertainty is and what to watch for. Set "consult_doctor" to false when the answer is
+clear-cut.
+
+MEDICAL REPORT RULE: when the user prompt lists findings from the user's own medical
+reports, use them. If a finding bears on this food (e.g. low haemoglobin and an iron-rich
+food, high blood sugar and a sweet fruit, a food the report says to limit), say so plainly
+in the explanation and adjust the serving advice. Do not mention findings that are
+irrelevant to this food.
 
 You will be told the TARGET of the verdict: "mother" (is this food safe for the user to eat,
 given their stated life stage) or "baby". When the target is "baby", the TARGET DETAIL line in
@@ -83,7 +94,8 @@ Respond ONLY with valid JSON matching this exact shape, no markdown, no preamble
   "recommended_serving": string or null,
   "better_alternatives": [string],
   "sources": [string],
-  "from_general_knowledge": boolean
+  "from_general_knowledge": boolean,
+  "consult_doctor": boolean
 }
 """
 
@@ -245,6 +257,12 @@ def constraints_note(profile: UserProfile) -> str:
             f"MEDICAL CONDITIONS: {', '.join(profile.health_conditions)}. "
             "Adjust the serving advice and risks for these."
         )
+    if profile.report_notes:
+        parts.append(
+            "FROM THE USER'S MEDICAL REPORTS:\n- "
+            + "\n- ".join(profile.report_notes)
+            + "\nApply the MEDICAL REPORT RULE."
+        )
     return "\n".join(parts)
 
 
@@ -383,6 +401,12 @@ def _analyze_for_unborn(food_query: str, profile: UserProfile) -> FoodSafetyResp
         note += (
             f"\nMEDICAL CONDITIONS: {', '.join(profile.health_conditions)}. "
             "Say how these change the risk to the baby."
+        )
+    if profile.report_notes:
+        note += (
+            "\nFROM THE MOTHER'S MEDICAL REPORTS:\n- "
+            + "\n- ".join(profile.report_notes)
+            + "\nApply the MEDICAL REPORT RULE, for the baby."
         )
 
     context_text = _build_context(food_query, "pregnancy fetal development placenta")

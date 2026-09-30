@@ -46,5 +46,6 @@ Map<String, dynamic> resultToJson(FoodSafetyResponse r) => {
       'sources': r.sources,
       'is_high_risk_override': r.isHighRiskOverride,
       'from_general_knowledge': r.fromGeneralKnowledge,
+      'consult_doctor': r.consultDoctor,
       'disclaimer': r.disclaimer,
     };

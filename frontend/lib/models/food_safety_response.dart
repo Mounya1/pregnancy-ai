@@ -49,6 +49,10 @@ class FoodSafetyResponse {
   /// from general nutrition knowledge. Shown on the card so it is never
   /// mistaken for guidance from a named source.
   final bool fromGeneralKnowledge;
+
+  /// The answer is a best effort worth confirming with a clinician. Shown as
+  /// a note under the answer, never in place of it.
+  final bool consultDoctor;
   final String disclaimer;
 
   FoodSafetyResponse({
@@ -63,6 +67,7 @@ class FoodSafetyResponse {
     this.sources = const [],
     this.isHighRiskOverride = false,
     this.fromGeneralKnowledge = false,
+    this.consultDoctor = false,
     this.disclaimer = 'This is not medical advice. Consult your doctor or pediatrician.',
   });
 
@@ -79,6 +84,7 @@ class FoodSafetyResponse {
       sources: List<String>.from(json['sources'] ?? const []),
       isHighRiskOverride: json['is_high_risk_override'] as bool? ?? false,
       fromGeneralKnowledge: json['from_general_knowledge'] as bool? ?? false,
+      consultDoctor: json['consult_doctor'] as bool? ?? false,
       disclaimer: json['disclaimer'] as String? ??
           'This is not medical advice. Consult your doctor or pediatrician.',
     );

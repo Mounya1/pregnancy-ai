@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../models/medical_report.dart';
 import '../models/user_profile.dart';
 import 'local_storage_service.dart';
 
@@ -22,6 +23,17 @@ class ProfileController extends ChangeNotifier {
     if (stored != null) _profile = stored;
     _loaded = true;
     notifyListeners();
+    // Reports uploaded before report notes existed count from the next launch
+    // on, without the user having to upload them again.
+    await refreshReportNotes();
+  }
+
+  /// Rebuilds [UserProfile.reportNotes] from the saved reports. Called after a
+  /// report is added or deleted, so answers always reflect the current set.
+  Future<void> refreshReportNotes() async {
+    final notes = reportNotesFrom(await _storage.loadMedicalReports());
+    if (listEquals(notes, _profile.reportNotes)) return;
+    await update((profile) => profile.copyWith(reportNotes: notes));
   }
 
   Future<void> update(UserProfile Function(UserProfile current) updater) async {

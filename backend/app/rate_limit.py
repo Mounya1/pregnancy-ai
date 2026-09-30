@@ -27,6 +27,9 @@ from app.config import settings
 # Cheap, AI-free, or needed to diagnose an outage - never limited.
 _EXEMPT_PATHS = {"/health", "/docs", "/openapi.json", "/redoc"}
 
+# GET endpoints that call a paid model.
+_PAID_GET_PATHS = {"/tts", "/assistant/insights"}
+
 _MINUTE = 60.0
 _DAY = 86_400.0
 
@@ -94,9 +97,14 @@ class AbuseProtectionMiddleware(BaseHTTPMiddleware):
         return JSONResponse(status_code=status, content={"detail": detail}, headers=headers)
 
     async def dispatch(self, request: Request, call_next):
-        # Only POSTs call the model. OPTIONS preflights must never be counted,
-        # or every real request would cost two.
-        if request.method != "POST" or request.url.path in _EXEMPT_PATHS:
+        # POSTs call the model, and so does GET /tts - a GET so the URL can go
+        # straight into an audio player, but it spends credit like any other.
+        # OPTIONS preflights must never be counted, or every request would
+        # cost two.
+        costs_credit = request.method == "POST" or (
+            request.method == "GET" and request.url.path in _PAID_GET_PATHS
+        )
+        if not costs_credit or request.url.path in _EXEMPT_PATHS:
             return await call_next(request)
 
         length = request.headers.get("content-length")
