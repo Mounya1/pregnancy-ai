@@ -21,13 +21,18 @@ class _SignInScreenState extends State<SignInScreen> {
   final _email = TextEditingController();
   String? _error;
 
+  /// E.g. "Your account is confirmed" when arriving from the code screen.
+  String? _notice;
+
   @override
   void initState() {
     super.initState();
     // Set here rather than as a `late final` with a context lookup: a lazy
     // initialiser can first run inside dispose(), and reading an inherited
     // widget from a deactivated element throws.
-    _email.text = context.read<AuthController>().account?.email ?? '';
+    final auth = context.read<AuthController>();
+    _email.text = auth.account?.email ?? '';
+    _notice = auth.takeSignInNotice();
   }
 
   @override
@@ -95,6 +100,29 @@ class _SignInScreenState extends State<SignInScreen> {
           : 'Enter your password to unlock your plans and records.',
       showBabyFigure: true,
       children: [
+        if (_notice != null) ...[
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: p.safeSurface,
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.check_circle_rounded, size: 16, color: p.safe),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    _notice!,
+                    style: TextStyle(fontSize: 12, height: 1.4, color: p.safe),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+        ],
         // Cloud accounts are keyed on email, and the same login works on any
         // device - so the address has to be editable, not assumed from
         // whatever this phone happens to remember.

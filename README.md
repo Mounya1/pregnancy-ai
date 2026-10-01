@@ -1,92 +1,107 @@
-# Pregnancy, Postpartum & Baby Nutrition AI Assistant
+# Pregnancy, Postpartum & Family Nutrition AI Assistant
 
-An AI-powered nutrition safety assistant covering **pregnancy**, **postpartum/breastfeeding**, and **baby feeding** — text chat, voice, and food-photo analysis, all grounded in ACOG/CDC/FDA/NIH/AAP guidance via RAG rather than raw LLM guesses.
+An AI health companion for **pregnancy**, **breastfeeding and postpartum**, **baby feeding**, and **general adult nutrition**. Ask about any food or any everyday health question by text, voice, or photo, and get answers tailored to your life stage, gender, allergies, conditions, and your own medical reports.
 
-Built as a full-stack portfolio project: FastAPI + LangChain/FAISS RAG backend, Flutter Web frontend
+Food answers are grounded in ACOG / CDC / FDA / NIH / AAP guidance through retrieval (RAG), with hard-coded overrides for the foods where a wrong answer is dangerous.
+
+**Stack:** FastAPI + LangChain/FAISS + OpenAI on Google Cloud Run · Flutter web and Android on Vercel · optional AWS Cognito accounts and DynamoDB sync.
 
 ---
 
-## Table of contents
+## Contents
 
 - [Features](#features)
+- [How answers work](#how-answers-work)
 - [Tech stack](#tech-stack)
 - [Architecture](#architecture)
 - [Project structure](#project-structure)
-- [Backend setup](#backend-setup)
-- [Frontend setup](#frontend-setup)
+- [Run it locally](#run-it-locally)
+- [Deploy](#deploy)
 - [API reference](#api-reference)
-- [Deployment](#deployment-free)
-- [Data & persistence](#data--persistence)
+- [Accounts & data](#accounts--data)
 - [Safety design](#safety-design)
-- [Scope & limitations](#scope--limitations)
+- [Limitations](#limitations)
 - [Troubleshooting](#troubleshooting)
-- [Roadmap](#roadmap--next-steps)
+- [Roadmap](#roadmap)
 
 ---
 
 ## Features
 
-| Feature | Description |
-|---|---|
-| 💬 Chat | Ask any food/nutrition question in plain text. Returns a Safe/Limit/Avoid verdict, explanation, benefits, risks, recommended serving, and cited sources (ACOG/CDC/FDA/NIH/AAP). |
-| 🎤 Voice | Real microphone recording (PCM16, wrapped as WAV client-side), transcribed via Whisper, answered through the same RAG pipeline as chat, and spoken back via TTS. |
-| 📷 Food photo analysis | Upload a photo of a meal, fruit, packaged food, or nutrition label. Vision model identifies the food; same verdict pipeline runs on the result. |
-| 👩‍🍼 Dual mother/baby verdicts | When a baby is in the picture (breastfeeding + baby's age set), one question can return **two** verdicts — e.g. "is honey safe?" → fine for a nursing mother in moderation, **Avoid** for a baby under 12 months (infant botulism risk). |
-| 🍽️ AI meal planner | Generates a 1–7 day meal plan (breakfast/lunch/dinner/snack) tailored to life stage, allergies, and dietary preferences. Hard-constrained to never suggest anything on the high-risk food lists. |
-| 📊 Nutrition tracker | Log foods from a small reference database; see daily progress bars for iron, calcium, folate, protein, and vitamin D against life-stage-adjusted RDA-style targets. |
-| ⭐ Saved foods | Bookmark any verdict from chat or a scan; view and remove them later. |
-| 🕐 History | Every chat, voice, and scan interaction is automatically logged and browsable. |
-| 👤 Profile | Set life stage, due date, or baby's birth date once — pregnancy week and baby age compute automatically from the date, same logic on both frontend and backend. Also holds allergies and dietary preferences, used everywhere (chat, meal planner, nutrition targets). |
-| ⚙️ Settings | Clear all locally stored data. |
-| 🚨 Hardcoded safety overrides | High-risk foods are never left purely to LLM judgment. Two separate lists: pregnancy hazards (raw fish, unpasteurized dairy, alcohol, high-mercury fish, deli meat, raw eggs, raw sprouts) and baby hazards (honey/botulism, choking hazards, cow's milk, added salt/sugar) — the latter age-gated so they correctly clear as the baby grows. |
+| | Feature | What it does |
+|---|---|---|
+| 💬 | **Chat** | Ask anything. Food questions ("can I eat custard apple?") get a Safe / Limit / Avoid verdict card; everyday health questions (sleep, exercise, symptoms, daily routine) get a conversational answer. Follow-ups use the recent conversation. |
+| 👩‍🍼 | **Mother + baby verdicts** | In pregnancy, one question returns a card for you and one for the unborn baby. With a baby eating solids, the second card is about feeding the baby directly - e.g. honey: fine for a nursing mother, **Avoid** under 12 months. |
+| 🎤 | **Voice** | Speak a question in any language (Whisper), hear the answer read back (OpenAI TTS). |
+| 📷 | **Food photo** | Photograph a meal, fruit, package, or label; the vision model identifies it and the same verdict pipeline runs. |
+| 🩺 | **Medical reports** | Upload a lab report (PDF or photo). It is summarised, conditions are added to your profile, and out-of-range values ("Haemoglobin 9.4 g/dL, low") shape every later answer and meal plan. |
+| 🍽️ | **Meal planner + grocery list** | 1-7 day plans built around your stage, allergies, cuisines, and conditions, with a combined grocery list grouped by aisle - tick items off or copy the list. Never includes a high-risk food. |
+| 📊 | **Nutrition tracker** | Search ~80 common foods (including Indian staples) or type any food for an AI estimate. Tracks iron, calcium, folate, protein, and vitamin D against targets for your stage - and, in General mode, your gender. |
+| 🏃 | **Fitness plan** | Stage-appropriate exercise with warning signs to stop. |
+| 🗓️ | **Pregnancy & baby tracking** | Week-by-week updates, kick counter, contraction timer, care plan and supplements, baby growth and milestones, reminders. |
+| 🌐 | **Answer language** | The AI replies in English, Hindi, Telugu, Tamil, Kannada, Marathi, Bengali, Spanish, French, Portuguese, Arabic, or Chinese. |
+| 🔐 | **Accounts** | Device-only by default; real email accounts with AWS Cognito when configured. |
 
-All user data (profile, saved foods, history, nutrition log) is stored **locally in the browser** (`shared_preferences`, i.e. localStorage on web) — no account or backend database required.
+The home screen follows your stage: a pregnancy picture while pregnant, a mother holding her baby after the birth, and a man or woman in General mode.
+
+---
+
+## How answers work
+
+**Every chat message is first sorted** by a small model (`gpt-4o-mini`): is it about a specific food, or a general health question?
+
+**Food questions** → retrieval over the knowledge base → `gpt-4o` → structured verdict:
+
+| The food is… | You get |
+|---|---|
+| In the sourced knowledge base | An answer from that guidance, with sources |
+| An everyday food not in it (custard apple, dates, guava…) | A full answer from general nutrition knowledge, labelled *"General guidance"* |
+| Uncertain (herbs, supplements, depends on your health) | Still a full answer, with the most cautious verdict and a **"check with your doctor"** note |
+| On the high-risk list, or one of your allergies | The app's own rules override the model |
+
+**Health questions** → `gpt-4o` with your stage, trimester, conditions, report findings, and language. Always practical steps; anything that could be urgent is put first with a clear "contact your doctor now".
 
 ---
 
 ## Tech stack
 
-**Backend**
-- FastAPI (Python 3.11+)
-- LangChain + FAISS for retrieval-augmented generation
-- OpenAI: GPT-4o (chat + vision), Whisper (speech-to-text), TTS (speech synthesis)
-- Pydantic for schema validation
+**Backend** - FastAPI (Python 3.11) · LangChain + FAISS · Pydantic · Docker on Google Cloud Run
 
-**Frontend**
-- Flutter Web
-- `provider` for app-wide state (profile)
-- `shared_preferences` for local persistence
-- `dio` for API calls, `image_picker` for photo capture, `record` for microphone input, `just_audio` for TTS playback
+| Job | Model (env var) |
+|---|---|
+| Answers, plans, reports | `gpt-4o` (`CHAT_MODEL`) |
+| Photos | `gpt-4o` (`VISION_MODEL`) |
+| Sorting chat messages | `gpt-4o-mini` (`ROUTER_MODEL`) |
+| Knowledge-base search | `text-embedding-3-small` (`EMBEDDING_MODEL`) |
+| Speech to text | `whisper-1` (`STT_MODEL`) |
+| Text to speech | `tts-1` (`TTS_MODEL`) |
+
+**Frontend** - Flutter (web + Android) · `provider` · `shared_preferences` · `dio` · `record` / `just_audio` · `image_picker` / `file_picker`
+
+**Also in the repo** - `web/`: a React (TanStack Start) client, "Bloom", that talks to the same backend's `/assistant/*` endpoints.
 
 ---
 
 ## Architecture
 
 ```
-Flutter Web app
-   ├── Home (quick actions, ask modes)
-   ├── Chat (text + voice)
-   ├── Food analysis (photo upload)
-   ├── Meal planner
-   ├── Nutrition tracker
-   ├── Saved foods / History
-   └── Profile / Settings
-        │  (all via ApiClient → Dio)
-        ▼
-FastAPI backend
-   ├── POST /chat            → RAG retrieval + GPT-4o → structured verdict(s)
-   ├── POST /voice           → Whisper STT → same RAG pipeline
-   ├── POST /food-analysis   → GPT-4o Vision → same RAG pipeline
-   ├── GET  /tts             → OpenAI TTS, streamed as audio/mpeg
-   ├── POST /meal-plan       → GPT-4o, constrained by high-risk lists
-   └── GET  /health
-        │
-        ▼
-FAISS vector store (built from seed_data/medical_knowledge.json)
-   + hardcoded high_risk_list.py (pregnancy + baby, age-gated)
+Flutter app (Vercel / Android)          React "Bloom" web client (web/)
+          │                                         │
+          └──────────────┬──────────────────────────┘
+                         ▼
+          FastAPI on Google Cloud Run  (OpenAI key in Secret Manager)
+          ├── rate limiting + upload cap (every AI-calling request)
+          ├── /chat, /voice   → router → food verdict (RAG) or health answer
+          ├── /food-analysis  → vision → food verdict
+          ├── /meal-plan, /fitness-plan, /medical-report, /nutrition/estimate
+          ├── /tts
+          ├── /assistant/*    → Bloom web client
+          └── /sync           → DynamoDB (optional, Cognito-authenticated)
+                         │
+                         ▼
+          FAISS index of seed_data/medical_knowledge.json (79 topics)
+          + high_risk_list.py (pregnancy + age-gated baby hazards)
 ```
-
-Every response (`/chat`, `/voice`, `/food-analysis`) returns the same `FoodSafetyResponse` shape for both the `structured` (mother) and optional `baby_structured` fields, so the frontend renders all three interaction modes with one shared widget (`SafetyVerdictCard` / `DualVerdictSection`).
 
 ---
 
@@ -95,244 +110,198 @@ Every response (`/chat`, `/voice`, `/food-analysis`) returns the same `FoodSafet
 ```
 backend/
   app/
-    main.py                 FastAPI app + router wiring, CORS
-    config.py                env-based settings (API keys, model names)
-    schemas.py                Pydantic models: FoodSafetyResponse, UserProfile,
-                               ChatResponse, MealPlanResponse, etc.
-    knowledge_base.py          builds/loads the FAISS vector store
-    high_risk_list.py          hardcoded safety overrides (pregnancy + baby, age-gated)
-    rag_chain.py                retrieval + LLM structured-answer pipeline
-    date_helpers.py              pregnancy-week / baby-age date math (mirrors frontend)
-    routers/
-      chat.py                    POST /chat
-      voice.py                   POST /voice
-      food_analysis.py            POST /food-analysis
-      tts.py                      GET /tts
-      meal_plan.py                 POST /meal-plan
-  seed_data/
-    medical_knowledge.json    starter RAG knowledge base (~20 entries)
-  requirements.txt
-  Dockerfile                 works for Render, Cloud Run, Fly.io ($PORT-aware)
-  render.yaml                Render Blueprint config (rootDir: backend)
-  .env.example
-
+    main.py              app, CORS, rate-limit middleware, /health
+    config.py            settings from environment variables
+    schemas.py           request/response models
+    rag_chain.py         food verdict pipeline (retrieval + rules + overrides)
+    health_chat.py       message router + everyday health answers
+    assistant.py         Bloom web client's assistant
+    rate_limit.py        per-client limits and upload cap
+    knowledge_base.py    builds/loads the FAISS index
+    high_risk_list.py    hard-coded safety overrides
+    auth_jwt.py          Cognito token verification (for /sync)
+    routers/             chat, voice, food_analysis, tts, meal_plan, fitness,
+                         medical_report, nutrition, assistant, sync
+  seed_data/medical_knowledge.json
+  vector_store/          prebuilt FAISS index
+  Dockerfile
 frontend/
   lib/
-    main.dart                  entrypoint, Provider setup
-    theme/app_theme.dart         purple brand palette, verdict colors
-    models/
-      user_profile.dart           life stage, due date, baby birth date + computed getters
-      food_safety_response.dart    mirrors backend schemas
-      history_entry.dart            local history log entry
-      saved_food.dart                bookmarked verdict
-      nutrition_log.dart              nutrient database + daily targets + log entries
-      meal_plan.dart                   meal plan model
-    services/
-      api_client.dart              backend API wrapper (Dio)
-      local_storage_service.dart    all local persistence (SharedPreferences)
-      profile_controller.dart        ChangeNotifier holding the app-wide profile
-      tts_service.dart                audio playback via just_audio
-    screens/
-      home_screen.dart             bottom-nav shell + home tab
-      chat_screen.dart               text + voice chat
-      food_analysis_screen.dart       photo upload + verdicts
-      meal_planner_screen.dart         AI meal plan generation + display
-      nutrition_tracker_screen.dart     food logging + progress bars
-      saved_foods_screen.dart           bookmarked verdicts
-      history_screen.dart                past interactions
-      profile_screen.dart                 editable profile form
-      settings_screen.dart                 clear-data option
-    widgets/
-      safety_verdict_card.dart      the shared verdict-rendering widget
-      quick_action_grid.dart          home screen quick actions
-      interaction_mode_selector.dart   Type / Voice / Scan row
-      placeholder_screen.dart          reusable "coming soon" screen
-  pubspec.yaml
+    models/              profile, verdicts, meal plans, reports, nutrition, ...
+    services/            API client, auth (device + Cognito), storage, sync
+    screens/             home, chat, planner, tracker, reports, profile, auth, ...
+    widgets/             verdict cards, stage figures, UI kit
+  assets/images/
+  test/
+web/                     React "Bloom" client
+cloudbuild.yaml          Cloud Build: deploy the backend on every push
+vercel.json              Vercel: build the Flutter web app
+DEPLOY.md                full deployment guide
 ```
 
 ---
 
-## Backend setup
+## Run it locally
+
+**Backend**
 
 ```bash
 cd backend
-python3 -m venv venv
-source venv/bin/activate          # Windows: venv\Scripts\activate
+python -m venv venv
+source venv/bin/activate              # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env
-```
-
-Edit `.env` and set your key:
-```
-OPENAI_API_KEY=sk-your-key-here
-```
-
-Build the vector store and start the server:
-```bash
-python -m app.knowledge_base
+cp .env.example .env                  # then set OPENAI_API_KEY
 uvicorn app.main:app --reload
 ```
 
-Verify it's working at `http://localhost:8000/docs` — try `POST /chat` with:
-```json
-{"message": "Can I eat pineapple?", "profile": {"life_stage": "pregnancy", "pregnancy_week": 20}}
-```
+Open `http://localhost:8000/docs`. The FAISS index ships in `vector_store/`; rebuild it after editing the knowledge base with `python -m app.knowledge_base`.
 
----
-
-## Frontend setup
+**Frontend**
 
 ```bash
 cd frontend
 flutter pub get
 flutter run -d chrome
+flutter test
 ```
 
-Talks to `http://localhost:8000` by default (configurable via `--dart-define=API_BASE_URL=...`, see Deployment below).
+It calls `http://127.0.0.1:8000` unless built with `--dart-define=API_BASE_URL=...`.
 
-> ⚠️ **Do not run `flutter create . --overwrite`** on an existing checkout — it resets `lib/` and `pubspec.yaml` to Flutter's default template, wiping the actual app. It's only needed once, the very first time, to generate the `android/`/`ios/`/`web/` scaffolding — which is already included in this repo.
+> ⚠️ Never run `flutter create . --overwrite` in this repo - it replaces `lib/` and `pubspec.yaml` with Flutter's template.
+
+---
+
+## Deploy
+
+Full steps are in **[DEPLOY.md](DEPLOY.md)**. In short:
+
+**Backend → Google Cloud Run** (from Cloud Shell):
+
+```bash
+git clone https://github.com/Mounya1/pregnancy-ai.git && cd pregnancy-ai
+gcloud run deploy pregnancy-ai-backend --source backend --region us-central1 \
+  --allow-unauthenticated --memory 1Gi --timeout 300
+# OpenAI key goes in Secret Manager - see DEPLOY.md §1c step 5
+gcloud run services update pregnancy-ai-backend --region us-central1 --max-instances 3
+```
+
+To update later: `git pull`, then the same `gcloud run deploy` line. Environment variables and secrets are kept.
+
+**Frontend → Vercel:** import the repo, leave Root Directory as `./` and Framework as **Other** (`vercel.json` does the build), and set:
+
+| Variable | Value |
+|---|---|
+| `API_BASE_URL` | your Cloud Run URL |
+| `COGNITO_REGION`, `COGNITO_CLIENT_ID` | optional - enables real accounts |
+
+The app reads these at **build** time, so redeploy after changing them. Then lock the API to your site:
+
+```bash
+gcloud run services update pregnancy-ai-backend --region us-central1 \
+  --update-env-vars ALLOWED_ORIGINS=https://your-site.vercel.app
+```
 
 ---
 
 ## API reference
 
-### `POST /chat`
+Interactive docs at `/docs` on any running backend.
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/chat` | Food verdict or health answer. Body: `message`, `profile`, optional `history` |
+| POST | `/voice` | Multipart `audio` + `profile_json` → transcript + chat response |
+| POST | `/food-analysis` | Multipart `image` + `profile_json` → detected food + verdicts |
+| GET | `/tts?text=` | Speech as `audio/mpeg`, usable directly as a media URL |
+| POST | `/meal-plan` | Day-by-day plan + `grocery_list` |
+| POST | `/fitness-plan` | Exercise plan + warning signs |
+| POST | `/medical-report` | Multipart `report` (PDF/photo) → summary, findings, conditions |
+| POST | `/nutrition/estimate` | Nutrients for a typed food |
+| POST | `/assistant/chat`, `/assistant/chat/stream`, `/assistant/symptom`, `/assistant/tips` · GET `/assistant/insights` | Bloom web client |
+| GET / PUT / DELETE | `/sync` | Cloud backup (Cognito token required) |
+| GET | `/health` | Status, key configured, index present, sync enabled |
+
+**`/chat` example**
+
 ```json
-// Request
 {
-  "message": "Can we have honey?",
+  "message": "hey can i eat custard apple",
   "profile": {
-    "life_stage": "breastfeeding",
-    "pregnancy_week": null,
-    "baby_age_months": 7,
+    "life_stage": "pregnancy",
+    "pregnancy_week": 24,
     "allergies": [],
-    "dietary_preferences": []
+    "health_conditions": ["anaemia"],
+    "report_notes": ["Haemoglobin 9.4 g/dL (low)"],
+    "language": "English"
   }
 }
 ```
-Returns `structured` (mother verdict) and, when relevant, `baby_structured` (baby verdict) — e.g. Safe for the mother, Avoid for baby under 12 months.
 
-### `POST /voice`
-Multipart form: `audio` (file), `profile_json` (JSON string). Returns transcript + the same chat response shape.
-
-### `POST /food-analysis`
-Multipart form: `image` (file), `profile_json` (JSON string). Returns detected food name, ingredients (if visible on a label), and the same dual verdict shape.
-
-### `GET /tts?text=...`
-Streams `audio/mpeg`. Designed to be used directly as a media URL (e.g. `just_audio`'s `setUrl`), not just a fetch-then-play step.
-
-### `POST /meal-plan`
-```json
-{
-  "profile": {"life_stage": "pregnancy", "pregnancy_week": 20},
-  "days": 3,
-  "dietary_preferences": ["vegetarian"],
-  "allergies": ["peanuts"]
-}
-```
-Returns a day-by-day plan, each day with breakfast/lunch/dinner/snack, each with a name, description, and why it fits.
+Returns `kind` (`"food"` or `"health"`), `reply_text`, and for food, `structured` (for you) and `baby_structured` (for baby) with `verdict`, `explanation`, `benefits`, `risks`, `recommended_serving`, `sources`, `from_general_knowledge`, and `consult_doctor`.
 
 ---
 
-## Deployment (free)
+## Accounts & data
 
-### Backend: Render
+- **Device-only (default):** the account and all data live in the browser or phone (`shared_preferences`). No server, and no password reset.
+- **Cloud accounts (optional):** build with `COGNITO_REGION` and `COGNITO_CLIENT_ID`. Sign-up emails a 6-digit code; entering it signs you straight in. Cognito holds identity only - name, email, password.
+- **Cloud sync (optional):** with DynamoDB configured on the backend, every device signed in to the same account - website and phone - shows the same profile and data, synced automatically within seconds. See DEPLOY.md §2b-2c.
 
-1. Push this repo to GitHub.
-2. Render dashboard → **New** → **Blueprint** → connect the repo.
-3. **Blueprint Path:** `backend/render.yaml` (not the default root path, since this is a monorepo).
-4. Render reads `rootDir: backend` from the yaml and builds from that subfolder automatically.
-5. Set `OPENAI_API_KEY` in the dashboard's environment variables after the service is created (it's marked `sync: false` in the yaml so it's never committed).
-6. Deploy. You'll get a URL like `https://pregnancy-ai-backend.onrender.com`.
-
-Only Render's **free Postgres database** expires after 30 days — this project has no database, so the web service itself has no such expiry. It sleeps after ~15 minutes idle and takes 30–60s to wake on the next request, which is fine for a portfolio demo.
-
-### Backend: Google Cloud Run (alternative — larger free quota, no sleep-related cold starts to worry about as much)
-
-```bash
-gcloud auth login
-gcloud config set project YOUR_PROJECT_ID
-gcloud run deploy pregnancy-ai-backend \
-  --source backend \
-  --region us-central1 \
-  --allow-unauthenticated \
-  --set-env-vars OPENAI_API_KEY=sk-your-key-here
-```
-
-### Frontend: any static host
-
-```bash
-cd frontend
-flutter build web --dart-define=API_BASE_URL=https://your-backend-url
-```
-
-Deploy `frontend/build/web/`:
-- **Netlify (fastest):** drag the `build/web` folder onto netlify.com/drop
-- **GitHub Pages:** push `build/web` contents to a `gh-pages` branch
-- **Vercel:** `vercel build/web --prod`
-
----
-
-## Data & persistence
-
-Everything the user creates — profile, saved foods, history, nutrition log — is stored **locally in the browser** via `shared_preferences`, which uses `localStorage` under the hood on Flutter Web. There is no backend database, no accounts, and no cross-device sync by design (see Scope & limitations below).
-
-`ProfileController` (a `ChangeNotifier` provided at the app root) holds the single in-memory copy of the user's profile and persists changes automatically; any screen can read it reactively via `context.watch<ProfileController>().profile`.
+Health data never leaves the device unless sync is switched on.
 
 ---
 
 ## Safety design
 
-The RAG pipeline grounds every LLM answer in retrieved passages from `medical_knowledge.json`, but retrieval + generation alone isn't trusted for the most safety-critical categories. `high_risk_list.py` hardcodes the verdict for well-established hazards, overriding whatever the LLM produced:
-
-- **Pregnancy list:** raw fish/sushi, unpasteurized dairy, deli meat, raw eggs, alcohol, shark/swordfish (mercury), raw sprouts
-- **Baby list (age-gated):** honey (<12mo, botulism risk), cow's milk as a main drink (<12mo), whole grapes/whole nuts/popcorn/hard candy (choking hazard, any age), added salt (<12mo), added sugar (<24mo)
-
-Age-gating means, for example, honey correctly stops being flagged once a baby's age is set past 12 months, while choking hazards apply regardless of age.
+- **Hard-coded overrides** (`high_risk_list.py`) decide the verdict for well-established hazards regardless of the model: raw fish, unpasteurised dairy, deli meat, raw eggs, alcohol, high-mercury fish, and raw sprouts in pregnancy. For babies, age-gated: honey and cow's milk as a drink under 12 months, added salt and sugar, and choking hazards at any age.
+- **Allergies always win** - a listed allergen is Avoid, for both cards.
+- **Stage-correct answers** - a General or postpartum user is never given pregnancy warnings.
+- **Sourced vs general** - answers not drawn from the sourced library are labelled, and uncertain ones carry a "check with your doctor" note.
+- **Urgent symptoms** - health answers lead with "contact your doctor now" for red-flag symptoms, and never diagnose or give medicine doses.
+- **Abuse protection** - 20 AI requests a minute and 300 a day per client, a 10 MB upload cap, and CORS locked to your site.
 
 ---
 
-## Scope & limitations
+## Limitations
 
-Being upfront about these matters if this is a portfolio piece:
-
-- **Local-only storage, no accounts** — deliberate scope choice, not a missing feature
-- **Medical knowledge base is a starter set** (~20 entries in `medical_knowledge.json`) — extend it before treating this as production-ready, and have a medical professional review it
-- **Nutrition tracker's food database is small** (~15 foods in `nutrition_log.dart`) — easy to extend, not exhaustive
-- **No rate limiting or abuse protection** on the public API URL
-- **This app does not provide medical advice.** Every response carries a disclaimer; always consult a doctor or pediatrician for real decisions.
+- **Not medical advice.** Every answer carries a disclaimer.
+- The knowledge base (79 topics) has **not been reviewed by a clinician** - that should happen before real-world use. Answers outside it come from the model's general knowledge and are labelled as such.
+- Nutrient values are rounded approximations for self-tracking.
+- The app's own buttons and labels are English-only; the AI's replies follow the chosen language.
+- Rate limits are counted per server instance, so the effective limit is the limit × `--max-instances`.
 
 ---
 
 ## Troubleshooting
 
-Issues encountered and fixed during development, kept here in case they resurface:
-
-| Symptom | Cause | Fix |
-|---|---|---|
-| `TypeError: Client.__init__() got an unexpected keyword argument 'proxies'` | `httpx` version incompatible with pinned `openai` | `pip install "httpx==0.27.2" --force-reinstall` (already pinned in `requirements.txt`) |
-| `404 Not Found` on `GET /` | No root route defined | Expected — use `/docs`, not `/` |
-| Browser shows Flutter's default counter demo | `flutter create . --overwrite` was run, wiping `lib/`/`pubspec.yaml` | Restore from git/backup; never run that command again on an existing checkout |
-| `Out of memory` Dart VM crash | Leftover zombie `dart.exe`/`flutter_tester.exe` processes, or too many unused heavy packages | Kill leftover processes in Task Manager, `flutter clean`, restart machine if it recurs |
-| `POST /chat` returns 404 in-app but works via curl | Multiple stale processes bound to port 8000 on different addresses (`localhost` resolving differently than `127.0.0.1`) | `netstat -ano \| findstr :8000`, kill every PID found, restart one clean instance; app now points at `127.0.0.1` explicitly |
-| `Exception: Stream not supported` from `record` package on web | `record`'s web backend only supports PCM16 for `startStream()`, not Opus | Use `AudioEncoder.pcm16bits`, wrap raw samples in a WAV header before upload (already implemented in `chat_screen.dart`) |
-| Quick actions / bottom nav did nothing | Left as empty `onTap: () {}` placeholders during initial scaffolding | All wired to real screens now |
+| Symptom | Fix |
+|---|---|
+| Chat says it cannot reach the server | `API_BASE_URL` was missing when Vercel built the app - set it and **Redeploy** |
+| CORS error in the browser console | `ALLOWED_ORIGINS` must exactly match your site's address, with no trailing `/` |
+| "You've asked a lot of questions…" | Rate limit - wait, or raise `RATE_LIMIT_PER_MINUTE` / `RATE_LIMIT_PER_DAY` |
+| `/health` shows `openai_key_configured: false` | Secret not attached - DEPLOY.md §1c step 5 |
+| Deploy fails: "Permission denied on secret" | Grant `roles/secretmanager.secretAccessor` to the compute service account |
+| Stuck on the confirmation-code screen | Tap **Back to sign in**; check spam for the code, or use **Send a new code** |
+| Old version still showing after deploy | Hard refresh (Ctrl+Shift+R) - browsers cache the Flutter app |
+| `TypeError: … unexpected keyword argument 'proxies'` | `httpx` must stay at 0.27.2 (pinned in `requirements.txt`) |
+| `Stream not supported` from `record` on web | Already handled - audio is recorded as PCM16 and wrapped as WAV |
 
 ---
 
-## Roadmap / next steps
+## Roadmap
 
-Roughly in priority order if you want to keep building:
-
-1. Get the medical knowledge base reviewed by a professional and expand it substantially
-2. Expand the nutrition tracker's food database
-3. Real accounts + cloud sync, if local-only storage becomes limiting
-4. Grocery list generation from a meal plan
-5. Multi-language support
-6. Rate limiting and basic abuse protection before sharing the API URL widely
+- [x] Expand the food database (15 → ~80 foods)
+- [x] Grocery list from meal plans
+- [x] AI replies in 12 languages
+- [x] Rate limiting and upload caps
+- [x] Everyday health questions in chat, not just food
+- [x] Use medical report values in answers
+- [ ] Clinical review of the knowledge base, then expand it
+- [ ] Translate the app's own interface
+- [x] Automatic sync between devices (needs the DynamoDB setup in DEPLOY.md §2c)
 
 ---
 
 ## Disclaimer
 
-This app does not provide medical advice. All guidance is for informational purposes only — always consult your doctor, OB-GYN, or pediatrician for decisions about your or your baby's health.
+This app does not provide medical advice. All guidance is for information only - always consult your doctor, midwife, OB-GYN, or paediatrician about your or your baby's health.

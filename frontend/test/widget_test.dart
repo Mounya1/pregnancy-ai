@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -24,6 +25,7 @@ import 'package:pregnancy_ai_assistant/models/user_profile.dart';
 import 'package:pregnancy_ai_assistant/models/weekly_stats.dart';
 import 'package:pregnancy_ai_assistant/models/account.dart';
 import 'package:pregnancy_ai_assistant/services/auth_controller.dart';
+import 'package:pregnancy_ai_assistant/services/sync_controller.dart';
 import 'package:pregnancy_ai_assistant/services/care_controller.dart';
 import 'package:pregnancy_ai_assistant/services/cognito_client.dart';
 import 'package:pregnancy_ai_assistant/services/emergency_controller.dart';
@@ -1650,6 +1652,84 @@ void main() {
     expect(await storage.loadShoppingRegion(), 'GB');
   });
 
+  test('confirming the code signs straight in, and the code screen has a way out',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final cognito = _FakeCognito();
+    final auth = AuthController(LocalStorageService(), cognito: cognito);
+    await auth.load();
+
+    expect(await auth.signUp(name: 'Asha', email: 'a@b.co', password: 'Passw0rd'), isNull);
+    expect(auth.status, AuthStatus.needsConfirmation);
+
+    // The bug: this used to land on the sign-in form, not Home.
+    expect(await auth.confirmSignUp('123456'), isNull);
+    expect(auth.status, AuthStatus.signedIn);
+    expect(cognito.signedInWith, 'Passw0rd');
+
+    // Already confirmed (e.g. a double tap) is not an error.
+    await auth.signOut();
+    cognito.confirmError = const CognitoException(
+      'NotAuthorizedException',
+      'That email and password do not match.',
+      detail: 'User cannot be confirmed. Current status is CONFIRMED',
+    );
+    cognito.needsConfirm = true;
+    expect(await auth.signIn('Passw0rd', email: 'a@b.co'), isNotNull);
+    expect(auth.status, AuthStatus.needsConfirmation);
+    cognito.needsConfirm = false;
+    expect(await auth.confirmSignUp('123456'), isNull);
+    expect(auth.status, AuthStatus.signedIn);
+
+    // And the code screen can always be left.
+    await auth.signOut();
+    cognito.needsConfirm = true;
+    await auth.signIn('Passw0rd', email: 'a@b.co');
+    expect(auth.status, AuthStatus.needsConfirmation);
+    await auth.cancelConfirmation();
+    expect(auth.status, AuthStatus.needsSignIn);
+  });
+
+  test('sync gives the phone and the website the same profile', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    final server = _FakeSyncServer();
+
+    // One device's session: its own storage, signed in, synced once.
+    Future<void> useDevice(Map<String, Object> prefs, {UserProfile? edit}) async {
+      SharedPreferences.setMockInitialValues(prefs);
+      final storage = LocalStorageService();
+      final auth = AuthController(storage, cognito: _FakeCognito());
+      await auth.load();
+      await auth.signIn('Passw0rd', email: 'a@b.co');
+      var restored = 0;
+      final sync = SyncController(storage, auth, dio: server.dio, onRestored: () => restored++);
+      await sync.syncNow();
+      if (edit != null) {
+        await storage.saveProfile(edit);
+        await sync.syncNow();
+      }
+      sync.dispose();
+    }
+
+    // The website is used first, by a pregnant user reading answers in Telugu.
+    await useDevice({}, edit: UserProfile(lifeStage: LifeStage.pregnancy, language: 'Telugu'));
+
+    // The phone had its own, different profile before sync existed.
+    SharedPreferences.setMockInitialValues({});
+    final phoneStorage = LocalStorageService();
+    await phoneStorage.saveProfile(UserProfile(lifeStage: LifeStage.general));
+    await useDevice(await _snapshotPrefs());
+    // After signing in, the phone shows the account's profile.
+    final onPhone = (await LocalStorageService().loadProfile())!;
+    expect(onPhone.lifeStage, LifeStage.pregnancy);
+    expect(onPhone.language, 'Telugu');
+
+    // A change made on the phone reaches the account copy.
+    await useDevice(await _snapshotPrefs(), edit: onPhone.copyWith(language: 'Hindi'));
+    final saved = server.data!['user_profile']['value'] as String;
+    expect(saved, contains('"language":"Hindi"'));
+  });
+
   // ---- Device-only account ----
 
   testWidgets('a device with no account opens on sign-up, not on Home', (tester) async {
@@ -1890,4 +1970,75 @@ void main() {
     await reloaded.load();
     expect(reloaded.mode, ThemeMode.dark);
   });
+}
+
+/// Stands in for Cognito: records what it was asked, answers from flags.
+class _FakeCognito extends CognitoClient {
+  _FakeCognito() : super(region: 'test', clientId: 'test');
+
+  String? signedInWith;
+  bool needsConfirm = false;
+  CognitoException? confirmError;
+
+  @override
+  Future<void> signUp({required String email, required String password, required String name}) async {}
+
+  @override
+  Future<void> confirmSignUp({required String email, required String code}) async {
+    final error = confirmError;
+    confirmError = null;
+    if (error != null) throw error;
+  }
+
+  @override
+  Future<CognitoTokens> signIn({required String email, required String password}) async {
+    if (needsConfirm) {
+      throw const CognitoException('UserNotConfirmedException', 'Needs confirming.');
+    }
+    signedInWith = password;
+    return CognitoTokens(
+      accessToken: 'a',
+      idToken: 'i',
+      refreshToken: 'r',
+      expiresAt: DateTime.now().add(const Duration(hours: 1)),
+    );
+  }
+
+  @override
+  Future<Map<String, String>> getUser(String accessToken) async =>
+      {'sub': 'u1', 'name': 'Asha', 'email': 'a@b.co'};
+}
+
+/// The current (mock) storage, in the shape setMockInitialValues takes - so
+/// a simulated device can be closed and reopened with its data intact.
+Future<Map<String, Object>> _snapshotPrefs() async {
+  final prefs = await SharedPreferences.getInstance();
+  return {for (final k in prefs.getKeys()) 'flutter.$k': prefs.get(k)!};
+}
+
+/// The backend's /sync, in memory: one document and its timestamp.
+class _FakeSyncServer {
+  Map<String, dynamic>? data;
+  String? updatedAt;
+  var _tick = 0;
+
+  late final Dio dio = Dio(BaseOptions(baseUrl: 'http://sync.test'))
+    ..interceptors.add(InterceptorsWrapper(onRequest: (options, handler) {
+      if (options.method == 'GET') {
+        return handler.resolve(Response(
+          requestOptions: options,
+          statusCode: 200,
+          data: {'data': data, 'updated_at': updatedAt},
+        ));
+      }
+      final body = options.data as Map;
+      data = jsonDecode(jsonEncode(body['data'])) as Map<String, dynamic>;
+      // Strictly increasing server times, like the real backend's clock.
+      updatedAt = DateTime.utc(2026, 1, 1).add(Duration(seconds: ++_tick)).toIso8601String();
+      handler.resolve(Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {'updated_at': updatedAt},
+      ));
+    }));
 }

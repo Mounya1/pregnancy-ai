@@ -450,7 +450,29 @@ class LocalStorageService {
     _tokensKey,
     _pendingEmailKey,
     _themeModeKey,
+    _syncHashKey,
+    _syncAtKey,
   };
+
+  // What this device last exchanged with the server: a fingerprint of the
+  // data, and the server's timestamp for it. Per device by definition, so
+  // never synced themselves.
+  static const _syncHashKey = 'sync_last_hash';
+  static const _syncAtKey = 'sync_last_at';
+
+  Future<(String?, DateTime?)> loadSyncState() async {
+    final prefs = await _prefs;
+    return (
+      prefs.getString(_syncHashKey),
+      DateTime.tryParse(prefs.getString(_syncAtKey) ?? ''),
+    );
+  }
+
+  Future<void> saveSyncState(String hash, DateTime? at) async {
+    final prefs = await _prefs;
+    await prefs.setString(_syncHashKey, hash);
+    if (at != null) await prefs.setString(_syncAtKey, at.toIso8601String());
+  }
 
   /// Every syncable key, as one JSON-safe map.
   ///

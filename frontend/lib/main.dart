@@ -55,8 +55,20 @@ class PregnancyAiApp extends StatelessWidget {
           create: (context) => SyncController(
             storage,
             Provider.of<AuthController>(context, listen: false),
+            // Data from another device lands in storage; every controller
+            // that caches it reloads, so the screens update in place.
+            onRestored: () {
+              context.read<ProfileController>().load();
+              context.read<ReminderController>().load();
+              context.read<ShoppingController>().load();
+              context.read<NutritionController>().load();
+              context.read<EmergencyController>().load();
+              context.read<CareController>().load();
+              context.read<KickController>().load();
+              context.read<ContractionController>().load();
+            },
           ),
-          update: (_, auth, previous) => previous ?? SyncController(storage, auth),
+          update: (_, auth, previous) => previous!,
         ),
         // Weekly updates are derived from the due date / birth date, so the
         // schedule has to be rebuilt whenever the profile changes - not only

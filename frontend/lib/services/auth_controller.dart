@@ -60,6 +60,21 @@ class AuthController extends ChangeNotifier {
   String? _pendingEmail;
   String? get pendingEmail => _pendingEmail;
 
+  /// The password typed at sign-up (or at a sign-in that turned out to need
+  /// confirming), so entering the code can sign straight in instead of
+  /// sending the person back to type it again. Memory only - never stored,
+  /// so an app restart mid-confirmation falls back to the sign-in form.
+  String? _pendingPassword;
+
+  /// One-off message for the sign-in form, e.g. after confirming an account
+  /// when the password was no longer in memory. Read once, then cleared.
+  String? _signInNotice;
+  String? takeSignInNotice() {
+    final notice = _signInNotice;
+    _signInNotice = null;
+    return notice;
+  }
+
   /// Cloud only: which form to show when the account state alone does not
   /// settle it. Null means "let the device decide".
   ///
@@ -395,6 +410,7 @@ class AuthController extends ChangeNotifier {
       // Remembered so a restart lands back on the code screen rather than an
       // empty sign-up form for an account that already half exists.
       _pendingEmail = email.trim();
+      _pendingPassword = password;
       await _storage.savePendingEmail(_pendingEmail);
       await _storage.saveAccount(Account(
         id: email.trim(),
@@ -413,6 +429,7 @@ class AuthController extends ChangeNotifier {
       // rather than dead-end on "already exists".
       if (e.userExists) {
         _pendingEmail = email.trim();
+        _pendingPassword = password;
         await _storage.savePendingEmail(_pendingEmail);
         _recomputeStatus();
         return 'An account already exists for this email. '
@@ -426,7 +443,11 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  /// Confirms a new account with the emailed code.
+  /// Confirms a new account with the emailed code, then signs straight in.
+  ///
+  /// It used to stop after confirming, which dropped the person on the
+  /// sign-in form to type the password they had just chosen - it looked like
+  /// the app was stuck on the auth screens rather than opening Home.
   Future<String?> confirmSignUp(String code) async {
     final email = _pendingEmail;
     if (email == null) return 'Nothing is waiting to be confirmed.';
@@ -435,17 +456,46 @@ class AuthController extends ChangeNotifier {
     _setBusy(true);
     try {
       await _cognito!.confirmSignUp(email: email, code: code.trim());
-      _pendingEmail = null;
-      await _storage.savePendingEmail(null);
-      _recomputeStatus();
-      return null;
     } on CognitoException catch (e) {
-      return e.message;
+      // Already confirmed - by an earlier tap, or on another device - is the
+      // outcome the person wanted, so carry on to sign-in.
+      if (!e.alreadyConfirmed) {
+        _setBusy(false);
+        return e.message;
+      }
     } catch (e) {
-      return _networkMessage(e);
-    } finally {
       _setBusy(false);
+      return _networkMessage(e);
     }
+
+    _pendingEmail = null;
+    await _storage.savePendingEmail(null);
+    final password = _pendingPassword;
+    _pendingPassword = null;
+
+    if (password != null) {
+      final failure = await _cloudSignIn(email: email, password: password);
+      if (failure == null) return null;
+      _signInNotice = 'Your account is confirmed. $failure';
+    } else {
+      _signInNotice = 'Your account is confirmed. Sign in to continue.';
+    }
+    _wantsSignUp = false;
+    _recomputeStatus();
+    _setBusy(false);
+    return null;
+  }
+
+  /// Leaves the code screen for the sign-in form - for a code that never
+  /// arrived, the wrong email, or an account already confirmed elsewhere.
+  /// Without it the code screen was a dead end, restored on every launch.
+  Future<void> cancelConfirmation() async {
+    _pendingEmail = null;
+    _pendingPassword = null;
+    await _storage.savePendingEmail(null);
+    _wantsSignUp = false;
+    _recomputeStatus();
+    notifyListeners();
   }
 
   Future<String?> resendCode() async {
@@ -478,8 +528,18 @@ class AuthController extends ChangeNotifier {
       _sessionActive = true;
 
       // Name comes from Cognito so it follows the account across devices,
-      // rather than being whatever this particular phone remembered.
-      final attributes = await _cognito.getUser(_tokens!.accessToken);
+      // rather than being whatever this particular phone remembered. Not
+      // fatal: the password was right and the tokens are saved, so a failure
+      // here must not leave the person on the sign-in form with a network
+      // error - fall back to what this device remembers.
+      var attributes = <String, String>{};
+      try {
+        attributes = await _cognito.getUser(_tokens!.accessToken);
+      } catch (_) {
+        if (_account?.email == email.trim()) {
+          attributes = {'sub': _account!.id, 'name': _account!.name};
+        }
+      }
       await _storage.saveAccount(Account(
         id: attributes['sub'] ?? email.trim(),
         name: attributes['name'] ?? '',
@@ -497,6 +557,7 @@ class AuthController extends ChangeNotifier {
     } on CognitoException catch (e) {
       if (e.needsConfirmation) {
         _pendingEmail = email.trim();
+        _pendingPassword = password;
         await _storage.savePendingEmail(_pendingEmail);
         _recomputeStatus();
       }

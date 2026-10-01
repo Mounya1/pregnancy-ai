@@ -441,12 +441,13 @@ class _Tile extends StatelessWidget {
 }
 
 
-/// Backup and restore across devices.
+/// Sync status, plus manual overrides.
 ///
-/// Deliberately two explicit buttons rather than silent background sync. With
-/// one document per user, the last write wins - and a background job that
-/// quietly overwrote a week of entries logged on another phone would be far
-/// worse than asking which direction you meant.
+/// Sync runs by itself (see SyncController): it always checks whether another
+/// device saved first, and runs within seconds of a change, so the one-copy
+/// last-write-wins model rarely has anything to lose. The buttons remain for
+/// the rare case of choosing a direction on purpose - e.g. making this
+/// device's copy the one the account keeps.
 class _SyncCard extends StatelessWidget {
   const _SyncCard();
 
@@ -495,8 +496,8 @@ class _SyncCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Your profile, food log, doctor notes and records - stored against '
-            'your account so another device can pick them up.',
+            'Your profile, food log, doctor notes and records sync automatically '
+            'between every device you sign in on - phone and website alike.',
             style: TextStyle(fontSize: 11.5, height: 1.45, color: p.textMuted),
           ),
           if (sync.message != null) ...[
@@ -515,7 +516,7 @@ class _SyncCard extends StatelessWidget {
             children: [
               Expanded(
                 child: GradientButton(
-                  label: busy ? 'Working...' : 'Back up now',
+                  label: busy ? 'Syncing...' : "Use this device's copy",
                   icon: Icons.cloud_upload_rounded,
                   loading: busy,
                   onPressed: busy ? null : () => context.read<SyncController>().push(),
@@ -531,8 +532,9 @@ class _SyncCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Backing up replaces the copy on your account. Restoring replaces '
-            'what is on this device. Whichever you did last is what you keep.',
+            'You rarely need these. "Use this device\'s copy" makes this device '
+            'the version every other device gets; "Restore" replaces this '
+            'device with the account\'s copy.',
             style: TextStyle(fontSize: 10.5, height: 1.4, color: p.textMuted),
           ),
         ],
@@ -569,7 +571,7 @@ class _SyncCard extends StatelessWidget {
     final restored = await sync.pull();
     if (restored && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Restored. Restart the app to see everything.')),
+        const SnackBar(content: Text('Restored from your account.')),
       );
     }
   }

@@ -494,15 +494,28 @@ environment variables. On Render they are dashboard fields.
 
 ### How it behaves
 
-**Me → Account → Sync across devices**, with two explicit buttons:
+Automatic, once the table is set up. Every device signed in to the same
+account - website, Android app, a second browser - shows the same profile and
+data:
 
-- **Back up now** - this device replaces the copy on your account
+- **On sign-in, app open, and returning to the app,** the device takes the
+  account's copy if another device saved since it last synced.
+- **Within about 15 seconds of any change,** and when the app is closed or
+  put in the background, the change is saved to the account.
+- **While the app is open,** it checks for other devices' changes every minute.
+
+The account holds one document, so if two devices change things within the
+same few seconds, the one saved last wins. Sync always checks for a newer copy
+before uploading, which keeps that window small.
+
+**First sync:** a device that has never synced takes whatever the account
+already has. So sign in first on the device whose profile you want to keep.
+
+**Me → Account → Sync across devices** shows the status, plus two manual
+overrides you rarely need:
+
+- **Use this device's copy** - this device replaces the copy on your account
 - **Restore** - your account replaces what is on this device
-
-Two buttons rather than silent background sync, on purpose. One document per
-user means the last write wins, and a background job that quietly overwrote a
-week of entries logged on another phone is worse than being asked which
-direction you meant.
 
 Session tokens, the account record and the theme are never uploaded - a
 backup restores your data, not someone else's login.

@@ -207,7 +207,7 @@ class CognitoTokens {
 
 /// A Cognito failure, translated into something worth showing a person.
 class CognitoException implements Exception {
-  const CognitoException(this.type, this.message);
+  const CognitoException(this.type, this.message, {this.detail = ''});
 
   /// Cognito's error type, e.g. `UserNotConfirmedException`. Screens branch on
   /// this - an unconfirmed account needs a code screen, not an error.
@@ -215,15 +215,25 @@ class CognitoException implements Exception {
 
   final String message;
 
+  /// Cognito's own message, before [message] rewords it. Kept because one
+  /// type covers cases that need different handling - see [alreadyConfirmed].
+  final String detail;
+
   bool get needsConfirmation => type == 'UserNotConfirmedException';
   bool get userExists => type == 'UsernameExistsException';
+
+  /// Confirming an account that is already confirmed comes back as
+  /// NotAuthorizedException - the same type as a wrong password - so without
+  /// this it read "That email and password do not match" on the code screen.
+  bool get alreadyConfirmed =>
+      type == 'NotAuthorizedException' && detail.toUpperCase().contains('CONFIRMED');
 
   factory CognitoException.fromResponse(Map<String, dynamic> data) {
     // Cognito puts the type in __type, sometimes prefixed with a namespace.
     final raw = (data['__type'] ?? data['type'] ?? 'UnknownError').toString();
     final type = raw.contains('#') ? raw.split('#').last : raw;
     final message = (data['message'] ?? data['Message'] ?? '').toString();
-    return CognitoException(type, _friendly(type, message));
+    return CognitoException(type, _friendly(type, message), detail: message);
   }
 
   /// Cognito's own wording is written for developers. These are the cases a

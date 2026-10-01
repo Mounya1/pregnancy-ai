@@ -94,6 +94,12 @@ class _ConfirmScreenState extends State<ConfirmScreen> {
           'for another - the new one replaces the old.',
           style: TextStyle(fontSize: 11, height: 1.4, color: p.textMuted),
         ),
+        const SizedBox(height: AppSpacing.lg),
+        TextButton.icon(
+          onPressed: auth.busy ? null : () => context.read<AuthController>().cancelConfirmation(),
+          icon: const Icon(Icons.arrow_back_rounded, size: 16),
+          label: const Text('Back to sign in', style: TextStyle(fontSize: 12.5)),
+        ),
       ],
     );
   }
