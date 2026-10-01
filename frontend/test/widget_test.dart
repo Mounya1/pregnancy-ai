@@ -37,6 +37,7 @@ import 'package:pregnancy_ai_assistant/services/shopping_controller.dart';
 import 'package:pregnancy_ai_assistant/services/theme_controller.dart';
 import 'package:pregnancy_ai_assistant/theme/app_theme.dart';
 import 'package:pregnancy_ai_assistant/theme/brand_flavor.dart';
+import 'package:pregnancy_ai_assistant/screens/chat_screen.dart';
 import 'package:pregnancy_ai_assistant/screens/me_screen.dart';
 import 'package:pregnancy_ai_assistant/widgets/app_nav_bar.dart';
 import 'package:pregnancy_ai_assistant/widgets/stage_figure.dart';
@@ -342,6 +343,42 @@ void main() {
       find.byWidgetPredicate((w) => w is PersonIllustration && w.tones == null),
       findsWidgets,
     );
+  });
+
+  testWidgets('Ask Bloom opens the chat with a back arrow to Home', (tester) async {
+    _usePhone(tester);
+    await tester.pumpWidget(const PregnancyAiApp());
+    await _settleHome(tester);
+
+    final ask = find.text('Ask Bloom');
+    await tester.scrollUntilVisible(ask.first, 150, scrollable: find.byType(Scrollable).first);
+    await tester.pumpAndSettle();
+    await tester.tap(ask.first);
+    await tester.pumpAndSettle();
+    expect(find.text('AI assistant'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Back to home'));
+    await tester.pumpAndSettle();
+    expect(find.text('AI assistant'), findsNothing);
+  });
+
+  testWidgets('the chat back arrow still works with no page underneath', (tester) async {
+    // A browser refresh on the chat leaves nothing to pop back to.
+    await tester.pumpWidget(MaterialApp(
+      // The chat is the only page - nothing underneath it.
+      onGenerateInitialRoutes: (_) => [
+        MaterialPageRoute(builder: (_) => ChatScreen(profile: UserProfile())),
+      ],
+      onGenerateRoute: (settings) => MaterialPageRoute(
+        builder: (_) => const Scaffold(body: Text('HOME')),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    expect(Navigator.of(tester.element(find.byType(ChatScreen))).canPop(), isFalse);
+    expect(find.byTooltip('Back to home'), findsOneWidget);
+    await tester.tap(find.byTooltip('Back to home'));
+    await tester.pumpAndSettle();
+    expect(find.text('HOME'), findsOneWidget);
   });
 
   testWidgets('illustrations animate normally but freeze under reduced motion',

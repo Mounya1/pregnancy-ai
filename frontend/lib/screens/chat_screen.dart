@@ -370,6 +370,21 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        // Always present, rather than Flutter's automatic one: that only
+        // appears when there is a page underneath, so a chat reached any
+        // other way (a browser refresh, a deep link) had no way home.
+        leading: IconButton(
+          tooltip: 'Back to home',
+          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+          onPressed: () {
+            final navigator = Navigator.of(context);
+            if (navigator.canPop()) {
+              navigator.pop();
+            } else {
+              navigator.pushReplacementNamed('/');
+            }
+          },
+        ),
         title: const Text('AI assistant'),
         flexibleSpace: DecoratedBox(
           decoration: BoxDecoration(gradient: p.heroGradient),
