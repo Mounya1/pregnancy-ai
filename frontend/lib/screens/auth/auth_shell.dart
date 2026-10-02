@@ -277,6 +277,76 @@ class _AuthFieldState extends State<AuthField> {
   }
 }
 
+/// Live password rules under a new-password field: each one ticks green as
+/// it is met, so nobody has to guess what the account service will accept.
+/// With [confirm], also shows whether the two passwords match.
+class PasswordChecklist extends StatelessWidget {
+  const PasswordChecklist({
+    super.key,
+    required this.password,
+    required this.rules,
+    this.confirm,
+  });
+
+  final TextEditingController password;
+  final List<(String, bool Function(String))> rules;
+  final TextEditingController? confirm;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final confirm = this.confirm;
+
+    return ListenableBuilder(
+      listenable: Listenable.merge([password, if (confirm != null) confirm]),
+      builder: (context, _) {
+        final value = password.text;
+        final items = [
+          for (final (label, test) in rules) (label, test(value)),
+          // Only once there is something to compare - an empty confirm field
+          // is not yet a mismatch.
+          if (confirm != null && confirm.text.isNotEmpty)
+            (
+              confirm.text == value ? 'Passwords match' : 'Passwords do not match yet',
+              confirm.text == value,
+            ),
+        ];
+
+        return Padding(
+          padding: const EdgeInsets.only(top: AppSpacing.sm),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final (label, met) in items)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 3),
+                  child: Row(
+                    children: [
+                      Icon(
+                        met ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                        size: 14,
+                        color: met ? p.safe : p.textMuted,
+                      ),
+                      const SizedBox(width: AppSpacing.xs + 2),
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: met ? p.safe : p.textMuted,
+                          fontWeight: met ? FontWeight.w600 : FontWeight.w400,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 /// The link between the two auth forms - "Already have an account? Sign in"
 /// and its mirror.
 ///

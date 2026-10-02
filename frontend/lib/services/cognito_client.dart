@@ -256,7 +256,8 @@ class CognitoException implements Exception {
         return 'That code has expired. Ask for a new one.';
       case 'InvalidPasswordException':
         return 'That password does not meet the requirements: at least 8 '
-            'characters, with an uppercase letter, a lowercase letter and a number.';
+            'characters, with an uppercase letter, a lowercase letter, a number '
+            'and a special character.';
       case 'InvalidParameterException':
         return fallback.isEmpty ? 'Something in that request was not valid.' : fallback;
       case 'LimitExceededException':

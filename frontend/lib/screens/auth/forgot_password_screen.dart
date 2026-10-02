@@ -123,12 +123,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           AuthField(
             controller: _password,
             label: 'New password',
-            hint: '8+ characters, upper and lower case, and a number',
             icon: Icons.lock_reset_rounded,
             obscure: true,
             textInputAction: TextInputAction.done,
             errorText: _error,
             onSubmitted: auth.busy ? null : _reset,
+          ),
+          PasswordChecklist(
+            password: _password,
+            rules: AuthController.cloudPasswordRules,
           ),
           const SizedBox(height: AppSpacing.xxl),
           GradientButton(

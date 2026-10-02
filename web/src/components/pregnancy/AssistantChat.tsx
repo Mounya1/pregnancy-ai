@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { AlertCircle, Send } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { AlertCircle, ArrowLeft, Send } from "lucide-react";
 
 import {
   Conversation,
@@ -52,6 +53,15 @@ export function AssistantChat() {
   return (
     <div className="mx-auto flex h-[calc(100dvh-7.5rem)] max-w-3xl flex-col px-5">
       <div className="flex items-center gap-3 border-b border-ink/5 py-4">
+        {/* Same way home as the symptom checker's "Back to overview". */}
+        <Link
+          to="/"
+          aria-label="Back to home"
+          title="Back to home"
+          className="-ml-2 inline-flex size-10 shrink-0 items-center justify-center rounded-full text-ink/60 transition hover:bg-brand-soft hover:text-ink"
+        >
+          <ArrowLeft className="size-5" />
+        </Link>
         <BloomAvatar className="size-10 rounded-2xl bg-brand-soft p-1" />
         <div>
           <p className="font-display text-lg font-bold leading-none">Bloom Assistant</p>

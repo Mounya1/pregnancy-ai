@@ -202,6 +202,22 @@ class AuthController extends ChangeNotifier {
     return null;
   }
 
+  /// Cognito's default password policy, as a checklist the sign-up and reset
+  /// screens tick off live. The special character was missing, so a password
+  /// like "Passw0rd" passed here and was then rejected by Cognito.
+  static final List<(String, bool Function(String))> cloudPasswordRules = [
+    ('At least 8 characters', (v) => v.length >= 8),
+    ('An uppercase letter (A-Z)', (v) => v.contains(RegExp(r'[A-Z]'))),
+    ('A lowercase letter (a-z)', (v) => v.contains(RegExp(r'[a-z]'))),
+    ('A number (0-9)', (v) => v.contains(RegExp(r'[0-9]'))),
+    (r'A special character (! @ # $ % & *)', (v) => v.contains(RegExp(r'[^A-Za-z0-9\s]'))),
+  ];
+
+  /// Device-only accounts have no server policy to match.
+  static final List<(String, bool Function(String))> devicePasswordRules = [
+    ('At least 6 characters', (v) => v.length >= 6),
+  ];
+
   /// Cognito enforces its own policy server-side and rejects with a generic
   /// message. Checking the same rules here means the person is told what is
   /// wrong while they are still typing, not after a round trip.
@@ -211,6 +227,9 @@ class AuthController extends ChangeNotifier {
     if (!value.contains(RegExp(r'[A-Z]'))) return 'Include an uppercase letter';
     if (!value.contains(RegExp(r'[a-z]'))) return 'Include a lowercase letter';
     if (!value.contains(RegExp(r'[0-9]'))) return 'Include a number';
+    if (!value.contains(RegExp(r'[^A-Za-z0-9\s]'))) {
+      return r'Include a special character, like ! @ # $ or %';
+    }
     return null;
   }
 

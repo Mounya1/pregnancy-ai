@@ -37,6 +37,7 @@ import 'package:pregnancy_ai_assistant/services/shopping_controller.dart';
 import 'package:pregnancy_ai_assistant/services/theme_controller.dart';
 import 'package:pregnancy_ai_assistant/theme/app_theme.dart';
 import 'package:pregnancy_ai_assistant/theme/brand_flavor.dart';
+import 'package:pregnancy_ai_assistant/screens/auth/auth_shell.dart';
 import 'package:pregnancy_ai_assistant/screens/chat_screen.dart';
 import 'package:pregnancy_ai_assistant/screens/me_screen.dart';
 import 'package:pregnancy_ai_assistant/widgets/app_nav_bar.dart';
@@ -343,6 +344,43 @@ void main() {
       find.byWidgetPredicate((w) => w is PersonIllustration && w.tones == null),
       findsWidgets,
     );
+  });
+
+  testWidgets('password checklist ticks each rule, including special characters',
+      (tester) async {
+    final password = TextEditingController();
+    final confirm = TextEditingController();
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.light(),
+      home: Scaffold(
+        body: PasswordChecklist(
+          password: password,
+          confirm: confirm,
+          rules: AuthController.cloudPasswordRules,
+        ),
+      ),
+    ));
+
+    int ticked() => find.byIcon(Icons.check_circle_rounded).evaluate().length;
+    expect(ticked(), 0);
+
+    password.text = 'Sunflower7';
+    await tester.pump();
+    expect(ticked(), 4, reason: 'everything but the special character');
+    expect(find.textContaining('special character'), findsOneWidget);
+
+    password.text = 'Sunflower7!';
+    await tester.pump();
+    expect(ticked(), 5);
+
+    confirm.text = 'Sunflower';
+    await tester.pump();
+    expect(find.text('Passwords do not match yet'), findsOneWidget);
+
+    confirm.text = 'Sunflower7!';
+    await tester.pump();
+    expect(find.text('Passwords match'), findsOneWidget);
+    expect(ticked(), 6);
   });
 
   testWidgets('Ask Bloom opens the chat with a back arrow to Home', (tester) async {
@@ -1565,7 +1603,8 @@ void main() {
     expect(AuthController.validateCloudPassword('alllowercase1'), contains('uppercase'));
     expect(AuthController.validateCloudPassword('ALLUPPERCASE1'), contains('lowercase'));
     expect(AuthController.validateCloudPassword('NoDigitsHere'), contains('number'));
-    expect(AuthController.validateCloudPassword('Sunflower7'), isNull);
+    expect(AuthController.validateCloudPassword('Sunflower7'), contains('special character'));
+    expect(AuthController.validateCloudPassword('Sunflower7!'), isNull);
 
     // Email is optional on a device account and required in the cloud.
     expect(AuthController.validateEmail(''), isNull);
@@ -1696,13 +1735,13 @@ void main() {
     final auth = AuthController(LocalStorageService(), cognito: cognito);
     await auth.load();
 
-    expect(await auth.signUp(name: 'Asha', email: 'a@b.co', password: 'Passw0rd'), isNull);
+    expect(await auth.signUp(name: 'Asha', email: 'a@b.co', password: 'Passw0rd!'), isNull);
     expect(auth.status, AuthStatus.needsConfirmation);
 
     // The bug: this used to land on the sign-in form, not Home.
     expect(await auth.confirmSignUp('123456'), isNull);
     expect(auth.status, AuthStatus.signedIn);
-    expect(cognito.signedInWith, 'Passw0rd');
+    expect(cognito.signedInWith, 'Passw0rd!');
 
     // Already confirmed (e.g. a double tap) is not an error.
     await auth.signOut();
@@ -1712,7 +1751,7 @@ void main() {
       detail: 'User cannot be confirmed. Current status is CONFIRMED',
     );
     cognito.needsConfirm = true;
-    expect(await auth.signIn('Passw0rd', email: 'a@b.co'), isNotNull);
+    expect(await auth.signIn('Passw0rd!', email: 'a@b.co'), isNotNull);
     expect(auth.status, AuthStatus.needsConfirmation);
     cognito.needsConfirm = false;
     expect(await auth.confirmSignUp('123456'), isNull);
@@ -1721,7 +1760,7 @@ void main() {
     // And the code screen can always be left.
     await auth.signOut();
     cognito.needsConfirm = true;
-    await auth.signIn('Passw0rd', email: 'a@b.co');
+    await auth.signIn('Passw0rd!', email: 'a@b.co');
     expect(auth.status, AuthStatus.needsConfirmation);
     await auth.cancelConfirmation();
     expect(auth.status, AuthStatus.needsSignIn);
@@ -1737,7 +1776,7 @@ void main() {
       final storage = LocalStorageService();
       final auth = AuthController(storage, cognito: _FakeCognito());
       await auth.load();
-      await auth.signIn('Passw0rd', email: 'a@b.co');
+      await auth.signIn('Passw0rd!', email: 'a@b.co');
       var restored = 0;
       final sync = SyncController(storage, auth, dio: server.dio, onRestored: () => restored++);
       await sync.syncNow();

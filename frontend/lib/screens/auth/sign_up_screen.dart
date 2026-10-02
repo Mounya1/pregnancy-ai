@@ -128,9 +128,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
         AuthField(
           controller: _password,
           label: 'Password',
-          hint: auth.isCloud
-              ? '8+ characters, upper and lower case, and a number'
-              : 'At least 6 characters',
           icon: Icons.lock_outline_rounded,
           obscure: true,
           textInputAction: TextInputAction.next,
@@ -146,6 +143,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
           textInputAction: TextInputAction.done,
           errorText: _confirmError,
           onSubmitted: busy ? null : _submit,
+        ),
+        PasswordChecklist(
+          password: _password,
+          confirm: _confirm,
+          rules: auth.isCloud
+              ? AuthController.cloudPasswordRules
+              : AuthController.devicePasswordRules,
         ),
         const SizedBox(height: AppSpacing.xxl),
         GradientButton(
